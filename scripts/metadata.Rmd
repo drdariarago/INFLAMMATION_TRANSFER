@@ -1,0 +1,55 @@
+---
+title: "metadata_report"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+setwd("/isdata/sandelin/projects/INFLAMMATION_TRANSFER/data/metadata")
+
+library(tidyverse)
+```
+
+# Reading in the metadata file
+
+```{r}
+metadata <- read.csv2("sample_metadata_table.csv")
+
+head(metadata)
+
+View(metadata)
+```
+
+# Weightloss between instillation and death depending on treatment
+
+```{r}
+metadata %>%
+ggplot(aes(x="Weight_instillation",y="Weight_death"/"Weight_instillation",col="Particle"))+
+  theme_bw()+geom_point()+
+  ggtitle("weightloss depends on particle exposure")
+```
+#No of animals having received LPS
+```{r}
+metadata %>%
+str_count("Particle",LPS)
+```
+
+
+# Reading in the genotyping and RIN scores of the maternal placentas
+```{r}
+MP <- read.csv2("sample_MP_RNA_table_KU.csv")
+
+head(MP)
+
+View(MP)
+```
+
+#No of MP samples
+```{r}
+str_length(MP,"Animal_ID")
+```
+
+
+# No of pups visually determined to be female but genotyped to be male
+```{r}
+str_count()
