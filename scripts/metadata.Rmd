@@ -5,27 +5,30 @@ output: html_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-setwd("/isdata/sandelin/projects/INFLAMMATION_TRANSFER/data/metadata")
 
 library(tidyverse)
+library(here)
 ```
 
 # Reading in the metadata file
 
 ```{r}
-metadata <- read.csv2("sample_metadata_table.csv")
-
-head(metadata)
-
-View(metadata)
+metadata <- read_csv2(here("data/metadata/sample_metadata_table.csv"))
+metadata
 ```
 
 # Weightloss between instillation and death depending on treatment
 
 ```{r}
 metadata %>%
-ggplot(aes(x="Weight_instillation",y="Weight_death"/"Weight_instillation",col="Particle"))+
-  theme_bw()+geom_point()+
+  mutate(., 
+         Weight_ratio = Weight_death / Weight_instillation,
+         time_group = paste(time_point, Particle, sep = "_")
+         ) %>% 
+ggplot(aes(x = time_point, y = Weight_ratio, col = Particle, group = time_group)) +
+  theme_bw() + 
+  geom_boxplot() +
+  geom_point() +
   ggtitle("weightloss depends on particle exposure")
 ```
 #No of animals having received LPS
@@ -37,19 +40,25 @@ str_count("Particle",LPS)
 
 # Reading in the genotyping and RIN scores of the maternal placentas
 ```{r}
-MP <- read.csv2("sample_MP_RNA_table_KU.csv")
+MP <- read_csv2(here("data/metadata/sample_MP_RNA_table_KU.csv"))
 
 head(MP)
 
 View(MP)
+
+#test
 ```
 
 #No of MP samples
 ```{r}
-str_length(MP,"Animal_ID")
+unique(MP$Animal_ID) %>% 
+  length(.)
 ```
 
 
 # No of pups visually determined to be female but genotyped to be male
 ```{r}
-str_count()
+str_extract(string = MP$No_female, pattern = "F[^1]|M.") 
+table(MP$No_female, useNA = "always")
+```
+
