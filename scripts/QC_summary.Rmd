@@ -1,0 +1,29 @@
+---
+title: "qc_summary"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+setwd("~/INFLAMMATION_TRANSFER")
+library(tidyverse)
+```
+
+
+# Reading the table
+```{r}
+
+qc_summary <- read.csv2(here("qc.summary.csv"))
+
+```
+# No of clean reads for each sample
+
+```{r}
+plot <- ggplot(data=qc_summary, aes(y=Clean_Reads, x=Sample_name)) + geom_bar(stat="identity")+theme_bw()
+
+plot
+```
+
