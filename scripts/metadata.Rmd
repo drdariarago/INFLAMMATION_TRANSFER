@@ -8,6 +8,8 @@ knitr::opts_chunk$set(echo = TRUE)
 
 library(tidyverse)
 library(here)
+library(stringr)
+library(dplyr)
 ```
 
 # Reading in the metadata file
