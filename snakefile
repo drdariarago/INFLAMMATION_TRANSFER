@@ -5,14 +5,13 @@ rule all:
     expand("results/fastqc/{filename}.zip", filename = fastq_files),
     "results/multiqc/multiqc.html"
 
-
 rule fastqc:
   input: 
-    "data/02_seqdata/{sample}.fq.gz"
+    "data/02_seqdata/{fastq_file}.fq.gz"
   output:
-    zip="results/fastqc/{sample}.zip"
+    zip="results/fastqc/{fastq_file}.zip"
   log:
-    "logs/fastqc/{sample}.log"
+    "logs/fastqc/{fastq_file}_fastqc.log"
   threads: 
     1
   shell:
@@ -22,7 +21,7 @@ rule fastqc:
     
 rule multiqc:
   input: 
-    expand("results/fastqc/{sample}.zip", sample = fastq_files)
+    expand("results/fastqc/{filename}.zip", filename = fastq_files)
   output: 
     "results/multiqc/multiqc.html"
   shell: 
