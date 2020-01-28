@@ -2,14 +2,14 @@ fastq_files, = glob_wildcards('data/02_seqdata/{filename}.fq.gz')
   
 rule all:
   input: 
-    expand("results/fastqc/{filename}.zip", filename = fastq_files),
+    expand("results/fastqc/{filename}_fastqc.zip", filename = fastq_files),
     "results/multiqc/multiqc.html"
 
 rule fastqc:
   input: 
     "data/02_seqdata/{fastq_file}.fq.gz"
   output:
-    zip="results/fastqc/{fastq_file}.zip"
+    zip="results/fastqc/{fastq_file}_fastqc.zip"
   log:
     "logs/fastqc/{fastq_file}_fastqc.log"
   threads: 
@@ -21,7 +21,7 @@ rule fastqc:
     
 rule multiqc:
   input: 
-    expand("results/fastqc/{filename}.zip", filename = fastq_files)
+    expand("results/fastqc/{filename}_fastqc.zip", filename = fastq_files)
   output: 
     "results/multiqc/multiqc.html"
   shell: 
