@@ -2,8 +2,8 @@ fastq_files, = glob_wildcards('data/02_seqdata/{filename}.fq.gz')
   
 rule all:
   input: 
-    expand("results/fastqc/{filename}_fastqc.zip", filename = fastq_files),
-    "results/multiqc/multiqc.html"
+    multiqc_report = "results/multiqc/multiqc.html",
+    trimmed_reads = expand("results/trim_reads/{filename}.fq", filename = fastq_files)
 
 rule md5:
   input:
@@ -42,4 +42,16 @@ rule multiqc:
   shell: 
     '''
     multiqc results/fastqc/ -n {output}
+    '''
+
+rule trim_reads:
+  input:
+    multiqc = "results/multiqc/multiqc.html",
+    fastq = "data/02_seqdata/{fastq_file}.fq.gz"
+  output: 
+    "results/trim_reads/{fastq_file}.fq"
+  threads: 1
+  shell:
+    '''
+    seqtk trimfq -b 11 {input.fastq} > {output}
     '''
