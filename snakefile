@@ -7,12 +7,16 @@ rule all:
 
 rule md5:
   input:
-    "results/02_seqdata/MD5.txt"
-  output:
+    "data/02_seqdata/MD5.txt",
+    "data/02_seqdata/MD5-1.txt"
+  log:
     "results/md5/md5_checks.txt"
+  output:
+    touch("results/md5_checks_completed.done")
+  threads: 20
   shell:
     '''
-    find data/02_seqdata/*.gz -execdir md5sum -c MD5.txt {{}} \; > {output}
+    cat {input} | awk '{{print $1 " data/02_seqdata/" $2}}' | parallel --jobs {threads} --pipe -N1 md5sum -c >> {log}
     '''
 
 rule fastqc:
