@@ -4,7 +4,7 @@ import re
 
 rule all:
   input: 
-    multiqc_report = "results/multiqc/multiqc.html",
+    multiqc_report = "reports/multiqc/multiqc.html",
     salmon_quant = expand("results/salmon/salmon_quant/{sample_id}", sample_id = [re.sub('_[1-2]$', '', string) for string in fastq_files])
 
 rule md5:
@@ -40,7 +40,7 @@ rule multiqc:
   input: 
     expand("results/fastqc/{filename}_fastqc.zip", filename = fastq_files)
   output: 
-    "results/multiqc/multiqc.html"
+    "reports/multiqc/multiqc.html"
   shell: 
     '''
     multiqc results/fastqc/ -n {output}
