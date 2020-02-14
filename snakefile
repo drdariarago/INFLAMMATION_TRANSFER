@@ -4,8 +4,8 @@ import re
 
 rule all:
   input: 
-    multiqc_report = "results/multiqc/multiqc.html",
-    salmon_quant = expand("results/salmon/salmon_quant/{sample_id}", sample_id = [re.sub('_[1-2]$', '', string) for string in fastq_files])
+    multiqc_report = "reports/multiqc/multiqc.html",
+    expression_results = "results/tximeta/expression_results.Rdata",
 
 rule md5:
   input:
@@ -40,7 +40,7 @@ rule multiqc:
   input: 
     expand("results/fastqc/{filename}_fastqc.zip", filename = fastq_files)
   output: 
-    "results/multiqc/multiqc.html"
+    "reports/multiqc/multiqc.html"
   shell: 
     '''
     multiqc results/fastqc/ -n {output}
@@ -134,3 +134,22 @@ rule salmon_quant:
             --threads {threads} \
     '''
     
+# Import sample metadata
+rule metadata_import:
+  input:
+  output:
+    rdata = "results/metadata/sample_metadata.Rdata",
+    csv = "results/metadata/sample_metadata.csv"
+  script:
+    "scripts/metadata.R"
+
+# Merge read counts and metadata via tximeta
+rule tximeta:
+  input:
+    salmon_dirs = expand("results/salmon/salmon_quant/{sample_id}", sample_id = list(set([re.sub('_[1-2]$', '', string) for string in fastq_files]))),
+    metadata = "results/metadata/sample_metadata.Rdata"
+  output:
+    expression_results = "results/tximeta/expression_results.Rdata",
+    variance_stabilized_counts = "results/tximeta/variance_stabilized_counts.csv"
+  script:
+    "scripts/tximeta.R"
