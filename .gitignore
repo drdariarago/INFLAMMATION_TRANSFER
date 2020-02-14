@@ -42,6 +42,4 @@ rsconnect/
 logs/
 results/
 
-# Include all (and only) html files from the reports folder, to have them accessible from the online repo
-reports/*/*
-!reports/*/*.html
+*.html
