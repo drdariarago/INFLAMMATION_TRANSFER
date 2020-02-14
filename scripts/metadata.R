@@ -1,10 +1,8 @@
+## SAMPLE METADATA
+# Create metadata tables for all samples
 
 library(tidyverse)
 library(here)
-
-## SAMPLE METADATA
-
-# Creating metadata tables for all samples
 
 sample_metadata_list <- 
   c("ml", "mli", "fli", "fp", "mp") %>% 
@@ -24,11 +22,11 @@ sample_metadata_tibble <-
   as_tibble(.) %>% 
   transmute(
     animal_no = 
-      str_extract(string = Animal_no, pattern = "[0-9]{1,}"),
+      str_extract(string = Animal_no, pattern = "[0-9]{1,}X?$"),
     sample_id = 
-      Animal_no,
+      str_replace(string = Animal_no, pattern = "lLi", replacement = "Li"),
     tissue = 
-      str_extract(string = sample_id, pattern = "^[:alpha:]{2,3}") %>%
+      str_extract(string = sample_id, pattern = "^[M,F][L,P]i?") %>%
       factor(x=., 
              levels = c("ML","MP","FP","MLi","FLi"), 
              labels = c("lung","placenta","placenta","liver", "liver")),
@@ -48,8 +46,8 @@ sample_metadata_tibble <-
 
 # Saving the r script to RDS
 
-saveRDS(object = sample_metadata_tibble, file = here("results/metadata/sample_metadata_tibble.Rdata"))
+saveRDS(object = sample_metadata_tibble, file = snakemake@output[["rdata"]])
 
 # Saving it as csv file
 
-write.csv(x = sample_metadata_tibble, file = here("/results/metadata/sample_metadata.csv"))
+write.csv(x = sample_metadata_tibble, file = snakemake@output[["csv"]], row.names = FALSE)
