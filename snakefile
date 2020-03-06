@@ -6,6 +6,8 @@ rule all:
   input: 
     multiqc_report = "reports/multiqc/multiqc.html",
     expression_results = "results/tximeta/expression_results.Rdata",
+    variance_stabilized_counts = 'results/tximeta/vsd.Rdata'
+
 
 rule md5:
   input:
@@ -153,3 +155,14 @@ rule tximeta:
     variance_stabilized_counts = "results/tximeta/variance_stabilized_counts.csv"
   script:
     "scripts/tximeta.R"
+
+# Create variance stabilized counts for exploratory plotting
+rule vsd:
+  input:
+    expression_results = 'results/tximeta/expression_results.Rdata'
+  output:
+    variance_stabilized_counts = 'results/tximeta/vsd.Rdata'
+  params:
+    min_counts = 9
+  script:
+    'scripts/vsd.R'
