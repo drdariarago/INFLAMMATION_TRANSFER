@@ -40,29 +40,25 @@ experiment_data$samples <-
 tissue_types = unique(experiment_data$samples$tissue2)
 
 experiment_list <-
-  lapply(
-    tissue_types, 
-    function(tissue){
-      experiment_data[,experiment_data$samples$tissue2 == tissue]
-    }
+  map(
+    .x = tissue_types,
+    .f = ~ experiment_data[, experiment_data$samples$tissue2 == .x]
   ) %>% 
   set_names(tissue_types)
 
 # Specify design matrix
 design_list <-
-  lapply(
-    experiment_list,
-    function(experiment){
-      model.matrix(
-        object = formula( ~ timepoint + timepoint:exposure) ,
-        contrasts.arg = list(
-          timepoint = "contr.treatment"),
-        data = experiment$samples
-      )}
+  map(
+    .x = experiment_list, 
+    .f = 
+      ~ model.matrix(
+        object = formula( ~ timepoint + timepoint:exposure),
+        contrasts.arg = list( timepoint = "contr.treatment"),
+        data = .x$samples
+    )
   )
 
 # Filter low expression genes and apply voom transformation
-
 filtered_data <-
   map2(
     .x = experiment_list,
@@ -86,15 +82,11 @@ filtered_data <-
     )
   )
 
-
 # Fit linear models
 linear_model_lists <-
-  lapply(
-    tissue_types, 
-    function(tissue) {
-      lmFit(
-        object = filtered_data[[tissue]],
-        design = design_list[[tissue]]
-      ) %>% 
-        eBayes()
-    })
+  map2(
+    .x = filtered_data,
+    .y = design_list,
+    .f = lmFit
+  ) %>%
+  map(., eBayes)
