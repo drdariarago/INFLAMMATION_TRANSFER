@@ -1,5 +1,4 @@
 # Check initial DE expression of genes over time
-
 library(limma)
 library(edgeR)
 library(DESeq2)
@@ -8,7 +7,7 @@ library(tidyverse)
 
 # Import data
 experiment_data <-
-  here::here("results/tximeta/expression_results.Rdata") %>%
+  snakemake@input[[1]] %>%
   readRDS() %>%
   {DGEList(
     counts  = assays(.) %>% extract2("counts"),
@@ -59,6 +58,8 @@ design_list <-
   )
 
 # Filter low expression genes and apply voom transformation
+pdf(file = snakemake@output[["plots"]])
+
 filtered_data <-
   map2(
     .x = experiment_list,
@@ -78,9 +79,12 @@ filtered_data <-
     .f = ~ voom(
       counts = .x,
       design = .y,
-      lib.size = .x$lib.size
+      lib.size = .x$lib.size,
+      plot = TRUE
     )
   )
+
+dev.off()
 
 # Fit linear models
 linear_model_lists <-
@@ -90,3 +94,5 @@ linear_model_lists <-
     .f = lmFit
   ) %>%
   map(., eBayes)
+
+write_rds(linear_model_lists, snakemake@output[["fitted_models"]])
