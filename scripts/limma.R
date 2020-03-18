@@ -64,21 +64,37 @@ design_list <-
 # Filter low expression genes and apply voom transformation
 
 filtered_data <-
+  map2(
+    .x = experiment_list,
+    .y = design_list,
+    .f = filterByExpr,
+    min.count = 5,
+    min.total.count = 1
+  ) %>% 
+  map2(
+    .x = .,
+    .y = experiment_list,
+    .f = ~ .y[.x, , keep.lib.sizes = T]
+  ) %>% 
+  map2(
+    .x = .,
+    .y = design_list,
+    .f = ~ voom(
+      counts = .x,
+      design = .y,
+      lib.size = .x$lib.size
+    )
+  )
+
+
+# Fit linear models
+linear_model_lists <-
   lapply(
     tissue_types, 
-    function(tissue){
-      filterByExpr(
-        y = experiment_list[[tissue]],
-        design = design_list[[tissue]],
-        min.count = 5,
-        min.total.count = 1
+    function(tissue) {
+      lmFit(
+        object = filtered_data[[tissue]],
+        design = design_list[[tissue]]
       ) %>% 
-        experiment_list[[tissue]][., , keep.lib.sizes = T] %>% 
-        voom(
-          design = design_list[[tissue]],
-          plot = T,
-          lib.size = .$lib.size
-        )
-    }
-  ) %>% 
-  set_names(tissue_types)
+        eBayes()
+    })
