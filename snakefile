@@ -7,7 +7,8 @@ rule all:
     multiqc_report = "reports/multiqc/multiqc.html",
     expression_results = "results/tximeta/expression_results.Rdata",
     variance_stabilized_counts = 'results/tximeta/vsd.Rdata',
-    fitted_models = "results/limma/fitted_models.Rdata"
+    fitted_models = "results/limma/fitted_models.Rdata",
+    limma_coefs = "results/limma/limma_coefs.Rdata"
 
 rule md5:
   input:
@@ -162,7 +163,8 @@ rule limma:
     "results/tximeta/expression_results.Rdata"
   output:
     plots = "results/limma/voom_plots.pdf",
-    fitted_models = "results/limma/fitted_models.Rdata"
+    fitted_models = "results/limma/fitted_models.Rdata",
+    limma_coefs = "results/limma/limma_coefs.Rdata"
   script:
     "scripts/limma.R"
 

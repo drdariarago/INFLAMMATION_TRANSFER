@@ -96,3 +96,31 @@ linear_model_lists <-
   map(., eBayes)
 
 write_rds(linear_model_lists, snakemake@output[["fitted_models"]])
+
+# Summarize results
+limma_coefs <- map(
+  .x = linear_model_lists, 
+  .f = topTable, 
+  number = Inf
+) %>% 
+  map(
+    .x = .,
+    .f = rename_at,
+    .vars = vars(matches("timepoint[0-9]{1,2}$")),
+    .funs = list(~ paste0(., ".exposureCTRL"))
+  ) %>% 
+  map(
+    .x = ., 
+    .f = select, 
+    ends_with(c("CTRL", "LPS", "Expr"))
+  ) %>% 
+  map(
+    .x = .,
+    .f = pivot_longer,
+    cols = ends_with(c("CTRL", "LPS")),
+    names_to = c("timepoint", "treatment"),
+    names_pattern = "([[:alnum:]]*)\\.([[:alnum:]]*)",
+    values_to = "LogFC"
+  ) 
+
+write_rds(limma_coefs, snakemake@output[["limma_coefs"]])
