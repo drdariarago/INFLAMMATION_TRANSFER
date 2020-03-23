@@ -8,7 +8,8 @@ rule all:
     expression_results = "results/tximeta/expression_results.Rdata",
     variance_stabilized_counts = 'results/tximeta/vsd.Rdata',
     fitted_models = "results/limma/fitted_models.Rdata",
-    limma_coefs = "results/limma/limma_coefs.Rdata"
+    limma_coefs = "results/limma/limma_coefs.Rdata",
+    dbscan_clusters = "results/dbscan/cluster_list.Rdata"
 
 rule md5:
   input:
@@ -167,6 +168,16 @@ rule limma:
     limma_coefs = "results/limma/limma_coefs.Rdata"
   script:
     "scripts/limma.R"
+
+# Cluster genes according to fold change
+rule dbscan:
+  input: 
+    coefs = "results/limma/limma_coefs.Rdata"
+  output:
+    clusters = "results/dbscan/cluster_list.Rdata",
+    plots = "results/dbscan/cluster_plots.pdf"
+  script : 
+    "scripts/DBSCAN.R"
 
 # Create variance stabilized counts for exploratory plotting
 rule vsd:
