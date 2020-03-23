@@ -115,6 +115,10 @@ limma_coefs <- map(
     ends_with(c("CTRL", "LPS", "Expr"))
   ) %>% 
   map(
+    rownames_to_column,
+    var = 'gene_id'
+  ) %>% 
+  map(
     .x = .,
     .f = pivot_longer,
     cols = ends_with(c("CTRL", "LPS")),
