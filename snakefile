@@ -169,6 +169,15 @@ rule limma:
   script:
     "scripts/limma.R"
 
+# Download gene symbols and description
+rule download_gene_data:
+  input:
+    "results/tximeta/variance_stabilized_counts.csv"
+  output:
+    "results/download_gene_data/gene_names.Rdata"
+  script:
+    "scripts/download_gene_data.R"
+
 # Cluster genes according to fold change
 rule dbscan:
   input: 
