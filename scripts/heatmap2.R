@@ -31,10 +31,11 @@ placenta_fetal_matrix <-
  
 library(RColorBrewer)
 colors <- 
-  colorRampPalette(rev(brewer.pal(9, "Blues")) )(255)
+  colorRampPalette(rev(brewer.pal(9, "PiYG")) )(255)
 
 pheatmap::pheatmap(
   placenta_fetal_matrix %>% t(),
+  color = colors,
   #annotation_row = timepoint_annotation,
   #clustering_distance_rows = "euclidean",
   #clustering_distance_cols = "euclidean",
@@ -46,8 +47,3 @@ pheatmap::pheatmap(
   cex= 0.9,
   show_colnames = F
 )
-
-
-
-
-
