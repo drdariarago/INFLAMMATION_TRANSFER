@@ -6,8 +6,11 @@ library(limma)
 library(magrittr)
 
 limma_results <-
-  here::here("results/limma/fitted_models.Rdata") %>% 
+  snakemake@input[["results"]] %>% 
   read_rds()
+
+LOG_THRESHOLD = snakemake@params[['fold_change_threshold']] %>% log2
+ALPHA = snakemake@params[['alpha']]
 
 ## Filter out genes with less than 0.5 change across all LPS contrasts
 ## Pick p-values
@@ -19,7 +22,7 @@ limma_global_pvals <-
       .x, 
       sort.by = 'none', 
       number = Inf, 
-      lfc = log2(1.5), 
+      lfc = LOG_THRESHOLD, 
       coef = 5:8 
     ) %>%
     {setNames(object = .$P.Value, nm = rownames(.))}
@@ -53,7 +56,7 @@ stager_result <-
   map(
     stageWiseAdjustment,
     method = 'none',
-    alpha = 0.05
+    alpha = ALPHA
   )
 
 stager_binary_result <- 
@@ -81,20 +84,7 @@ stager_binary_result <-
   )
 
 # Convert ENSEMBL IDs to gene symbols
-
-library(biomaRt)
-
-gene_annotation <-
-  getBM(
-    mart = useEnsembl(biomart = "ensembl", dataset = "mmusculus_gene_ensembl", mirror = 'useast'),
-    filters = "ensembl_gene_id", 
-    attributes = c("ensembl_gene_id", "mgi_symbol", "description"),
-    values = map(
-      .x = stager_binary_result, 
-      .f = ~ .x$gene_id %>%
-        str_extract(string = ., pattern = "^[[:alnum:]]*")
-      ) %>% unlist %>% unique 
-  )
+gene_annotation <- read_rds(snakemake@input[["gene_data"]])
 
 annotated_results <-
   stager_binary_result %>% 
@@ -109,13 +99,13 @@ annotated_results <-
     .f = ~ cbind(.x[,-3], .x[,3])
   )
 
-write_rds(x = annotated_results, path = here::here("results/limma_results/annotated_results.Rdata"))
+write_rds(x = annotated_results, path = snakemake@output[["r_summaries"]])
 
 map2(
   .x = annotated_results, 
-  .y = names(annotated_results),
+  .y = snakemake@output[["csv_summaries"]],
   .f = ~ write_csv(
     x = .x,
-    path = paste0("results/limma_results/significant_contrasts_", .y, ".csv") 
+    path = .y
   )
 )

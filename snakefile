@@ -1,4 +1,5 @@
 fastq_files, = glob_wildcards('data/02_seqdata/{filename}.fq.gz')
+TISSUE_TYPES = ("placenta_maternal", "lung_maternal", "liver_maternal", "liver_fetal", "placenta_fetal")
 
 import re
 
@@ -9,6 +10,7 @@ rule all:
     variance_stabilized_counts = 'results/tximeta/vsd.Rdata',
     fitted_models = "results/limma/fitted_models.Rdata",
     limma_coefs = "results/limma/limma_coefs.Rdata",
+    limma_summaries = expand("results/limma_results/significant_contrasts_{tissue}.csv", tissue = TISSUE_TYPES),
     dbscan_clusters = "results/dbscan/cluster_list.Rdata"
 
 rule md5:
@@ -178,6 +180,20 @@ rule download_gene_data:
   script:
     "scripts/download_gene_data.R"
 
+# Summarize differential expression results
+rule limma_results:
+  input:
+    results = "results/limma/fitted_models.Rdata",
+    gene_data = "results/download_gene_data/gene_names.Rdata"
+  output:
+    r_summaries = "results/limma_results/annotated_results.Rdata",
+    csv_summaries = expand("results/limma_results/significant_contrasts_{tissue}.csv", tissue = TISSUE_TYPES)
+  params:
+    fold_change_threshold = 1.5,
+    alpha = 0.05
+  script:
+    "scripts/limma_results.R"
+
 # Cluster genes according to fold change
 rule dbscan:
   input: 
@@ -185,7 +201,7 @@ rule dbscan:
   output:
     clusters = "results/dbscan/cluster_list.Rdata",
     plots = "results/dbscan/cluster_plots.pdf"
-  script : 
+  script: 
     "scripts/DBSCAN.R"
 
 # Create variance stabilized counts for exploratory plotting
