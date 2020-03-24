@@ -3,30 +3,47 @@
 library(tidyverse)
 library(stageR)
 library(limma)
+library(magrittr)
 
 limma_results <-
   here::here("results/limma/fitted_models.Rdata") %>% 
   read_rds()
 
-
-## Filter out genes with less than 0.5 change across all contrasts
+## Filter out genes with less than 0.5 change across all LPS contrasts
 ## Pick p-values
 
 limma_global_pvals <-
   limma_results %>% 
   map(
-    ~ topTable(.x, sort.by = 'none', number = Inf) %$%
-      P.Value %>% 
-      set_names(x = ., nm = row.names(.x$p.value))
+    ~ topTable(
+      .x, 
+      sort.by = 'none', 
+      number = Inf, 
+      lfc = log2(1.5), 
+      coef = 5:8 
+    ) %>%
+    {setNames(object = .$P.Value, nm = rownames(.))}
   )
+
+## Subset only gene results that pass initial filtering criteria
+limma_filtered_results <-
+  limma_results %>% 
+  map2(
+    .x = .,
+    .y = limma_global_pvals,
+    ~ .x$p.value %>% 
+      magrittr::extract(, 5:8) %>% 
+      magrittr::extract(row.names(.) %in% names(.y),)
+  )
+
 
 stager_input <-
   map2(
     .x = limma_global_pvals,
-    .y = limma_results, 
+    .y = limma_filtered_results, 
     .f = ~ stageR(
       pScreen = .x,
-      pConfirmation = .y$p.value[,5:8],
+      pConfirmation = .y,
       pScreenAdjusted = FALSE
     )
   )
@@ -57,9 +74,9 @@ stager_binary_result <-
     -starts_with("padj")
   ) %>% 
   map(
-    ~ set_names(
+    ~ set_colnames(
       x = .x,
-      nm = names(.x) %>% str_extract(pattern = "(^timepoint[0-9]{1,2}|gene_id)")
+      value = names(.x) %>% str_extract(pattern = "(^timepoint[0-9]{1,2}|gene_id)")
     )
   )
 
