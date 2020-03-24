@@ -6,6 +6,12 @@ library(tidyverse)
 fold_change_list <-
   read_rds(path = snakemake@input[["coefs"]])
 
+significant_genes <-
+  read_rds(path = snakemake@input[["result_list"]]) %>% 
+  map(
+    ~ .x$ensembl_gene_id
+  )
+
 # Convert to tissue-specific list matrices, scaled by 
 
 fold_change_matrices <-
@@ -14,6 +20,11 @@ fold_change_matrices <-
     filter,
     treatment == 'exposureLPS'
     ) %>% 
+  map2(
+    .x = .,
+    .y = significant_genes,
+    ~ .x[str_extract(string = .x$gene_id, pattern = "^[[:alnum:]]*") %in% .y, ]
+  ) %>% 
   map(
     group_by,
     gene_id
@@ -57,7 +68,7 @@ scan_results <-
   fold_distances %>% 
   map(
     hdbscan, 
-    minPts = 10
+    minPts = snakemake@params[["min_genes_per_cluster"]]
   )
 
 write_rds(x = scan_results, path = snakemake@output[["clusters"]])

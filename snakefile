@@ -194,10 +194,13 @@ rule limma_results:
 # Cluster genes according to fold change
 rule dbscan:
   input: 
-    coefs = "results/limma/limma_coefs.Rdata"
+    coefs = "results/limma/limma_coefs.Rdata",
+    result_list = "results/limma_results/annotated_results.Rdata"
   output:
     clusters = "results/dbscan/cluster_list.Rdata",
     plots = "results/dbscan/cluster_plots.pdf"
+  params:
+    min_genes_per_cluster = 20
   script: 
     "scripts/DBSCAN.R"
 
