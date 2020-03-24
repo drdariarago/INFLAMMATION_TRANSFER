@@ -6,10 +6,7 @@ import re
 rule all:
   input: 
     multiqc_report = "reports/multiqc/multiqc.html",
-    expression_results = "results/tximeta/expression_results.Rdata",
     variance_stabilized_counts = 'results/tximeta/vsd.Rdata',
-    fitted_models = "results/limma/fitted_models.Rdata",
-    limma_coefs = "results/limma/limma_coefs.Rdata",
     limma_summaries = expand("results/limma_results/significant_contrasts_{tissue}.csv", tissue = TISSUE_TYPES),
     dbscan_clusters = "results/dbscan/cluster_list.Rdata"
 
