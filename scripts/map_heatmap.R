@@ -13,7 +13,7 @@ limma_coefs %>%
   map(.x = ., .f = ~ select(.x, -c(treatment))) %>% 
   map(.x = ., .f = ~ mutate(.data = .x, gene_id = gsub('\\..*', '', gene_id)))
 
-# Read annotated results
+# Read annotated results - not sure if the pivot_longer is needed..
 annotated_results <- 
   readRDS(here::here("results/limma_results/annotated_results.Rdata")) %>% 
   map(.x = ., 
@@ -27,7 +27,7 @@ annotated_results <-
       .f = ~ dplyr::select(.data = .x, -3)
   )
 
- #Join the two lists and transform into matrix
+ #Join the two lists
 all_results <-
   map2(.x= annotated_results, .y = non_annotated_results,
        .f = ~ full_join(
@@ -42,57 +42,30 @@ all_results <-
     names_from = timepoint,
     values_from = LogFC)) %>%
   map(.x = ., .f = ~ column_to_rownames(.x, var = 'ensembl_gene_id')) %>%
-  map(.x = ., .f = as.matrix) #%>%
-  #map(.x = ., .f = t)
+  map(.x = ., .f = as.matrix)
  
 #heatmap!
 colors <- 
   colorRampPalette(
     RColorBrewer::brewer.pal(9, "PiYG")
-  )(255)
+  )(255) %>%
+  rev()
 
-# heatmap_all <-
-map(
+iwalk(
   .x = all_results,
   .f = ~ pheatmap(
-  mat = .x,
-  color = colors,
-  clustering_distance_rows = "correlation",
-  clustering_method = "average",
-  scale = "row",
-  cluster_rows = T,
-  cluster_cols = F,
-  display_numbers = F,
-  cex= 0.9,
-  show_colnames = T
-  ))
-
-# Saving heatmaps - not functioning before heatmaps are completely fine
-imap(
-  .x = heatmap_all,
-  .f = ~ ggsave(
-    plot = .x,
-    path = here::here("results/heatmaps_all_tissues.png"),
-    filename = paste0(.y, "_heatmaps_all_tissues.png"),
-    width = 6.67, height = 7.5, units = 'in',
-    device = "png"
+    mat = .x,
+    color = colors,
+    clustering_distance_cols = "correlation",
+    clustering_method = "average",
+    scale = "row",
+    cluster_rows = T,
+    cluster_cols = F,
+    display_numbers = F,
+    cex= 0.9,
+    show_rownames = F,
+    angle_col = 0,
+    fontsize_col = 15,
+    main = paste0("Fold change in ", .y, "\n for genes with q-value < 0.05")
   )
 )
-
-#Old 'standard' heatmap
-pheatmap::pheatmap(
-  placenta_fetal_matrix %>% t(),
-  color = colors,
-  clustering_distance_cols = "correlation",
-  clustering_method = "average",
-  scale = "column",
-  cluster_rows = F,
-  cluster_cols = T,
-  display_numbers = F,
-  cex= 0.9,
-  show_colnames = F,
-  main = "placenta fetal p = 0.05, 1008 genes"
-)
-
-
-
