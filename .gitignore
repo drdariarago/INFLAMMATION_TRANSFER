@@ -42,4 +42,13 @@ rsconnect/
 logs/
 results/
 
+# Binary results
+reports/
 *.html
+
+# Git system folders
+hooks/
+info/
+description
+HEAD
+config
