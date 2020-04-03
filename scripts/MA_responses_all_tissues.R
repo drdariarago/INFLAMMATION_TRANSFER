@@ -44,8 +44,6 @@ placenta_fetal_all <-
                  labels = paste0(c(2, 5, 12, 24), " hours after exposure" ))
       )
   ) 
-  
-# %>%   bind_rows(., .id = "contrast")
 
 MA_plots <- 
   imap(
@@ -71,7 +69,8 @@ imap(
   .f = ~ ggsave(
     plot = .x,
     path = here::here("results/MA_responses_all_tissues"),
-    filename = paste0(.y, "_MA_plot.pdf"),
-    width = 13.3, height = 7.5, units = 'in'
+    filename = paste0(.y, "_MA_plot.png"),
+    width = 6.67, height = 7.5, units = 'in',
+    device = "png"
   )
 )
