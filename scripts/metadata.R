@@ -41,8 +41,10 @@ sample_metadata_tibble <-
              levels = c("nanopurevand","nanopure","Control","ctr","Ctr","LPS","TiO2"), 
              labels = c("ctr","ctr","ctr","ctr","ctr","LPS","TiO2")),
     rna_date = 
-      rna_date
-  ) 
+      rna_date,
+    timepoint =
+      timepoint
+  )
 
 # Saving the r script to RDS
 
@@ -51,3 +53,4 @@ saveRDS(object = sample_metadata_tibble, file = snakemake@output[["rdata"]])
 # Saving it as csv file
 
 write.csv(x = sample_metadata_tibble, file = snakemake@output[["csv"]], row.names = FALSE)
+
