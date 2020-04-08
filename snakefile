@@ -8,7 +8,8 @@ rule all:
     multiqc_report = "reports/multiqc/multiqc.html",
     variance_stabilized_counts = 'results/tximeta/vsd.Rdata',
     limma_summaries = expand("results/limma_results/significant_contrasts_{tissue}.csv", tissue = TISSUE_TYPES),
-    dbscan_clusters = "results/dbscan/cluster_list.Rdata"
+    dbscan_clusters = "results/dbscan/cluster_list.Rdata",
+    enrichment_results = "results/gost_enrichment/enrichment_tables.csv"
 
 rule md5:
   input:
@@ -214,3 +215,16 @@ rule vsd:
     min_counts = 9
   script:
     'scripts/vsd.R'
+
+# Find GO and other enrichment terms across limma results
+rule enrichment:
+  input: 
+    "results/limma/limma_coefs.Rdata"
+  output:
+    raw_results = "results/gost_enrichment/enrichment_results.Rdata",
+    results_table = "results/gost_enrichment/enrichment_tables.csv"
+  params:
+    expression_threshold = 0,
+    min_fdr = 0.05
+  script:
+    'scripts/gost_enrichment.R'
