@@ -46,7 +46,7 @@ gost_result_list <-
       ordered_query = TRUE, 
       multi_query = TRUE,
       organism = "mmusculus",
-      sources = c("GO", "TF"), 
+      sources = c("GO"), 
       domain_scope = "custom", 
       custom_bg = .y,
       correction_method = "gSCS",
@@ -63,8 +63,7 @@ write_rds(x = gost_result_list, path = snakemake@output[["raw_results"]])
 gost_results_table <- 
   gost_result_list %>% 
   map_df(.f = ~ .x$result, .id = "contrast") %>% 
-  go_results %>% 
-  dplyr::select(contrast, term_id, significant, source, term_name, query_sizes, intersection_sizes) %>% 
+  dplyr::select(contrast, term_id, term_name, significant, source, term_size, query_sizes, intersection_sizes) %>% 
   mutate_if(
     .predicate = is.list, 
     .funs = ~ map_chr(.x = ., .f = paste0, collapse = ":" )
@@ -78,12 +77,12 @@ gost_results_table <-
     col = query_sizes,
     sep = ":",
     convert = TRUE,
-    into = paste0("total_annotated_", c(2,5,12,24), "_hrs")
+    into = paste0("query_size_", c(2,5,12,24), "_hrs")
   ) %>%  separate(
     col = intersection_sizes,
     sep = ":",
     convert = TRUE,
-    into = paste0("significant_annotated_", c(2,5,12,24), "_hrs")
+    into = paste0("intersection_size_", c(2,5,12,24), "_hrs")
   )
 
 write_csv(x = gost_results_table, path = snakemake@output[["results_table"]])
