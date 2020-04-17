@@ -54,19 +54,20 @@ colors <-
 iwalk(
   .x = all_results,
   .f = ~ pheatmap(
-    mat = .x,
+    mat = .x %>% t(),
     color = colors,
-    clustering_distance_cols = "correlation",
-    clustering_method = "average",
-    scale = "row",
+    #clustering_distance_cols = "correlation",
+    #clustering_method = "average",
+    #scale = "none",
     cluster_rows = T,
     cluster_cols = F,
     display_numbers = F,
     cex= 0.9,
     show_rownames = F,
     angle_col = 0,
-    fontsize_col = 15,
-    main = paste0("Fold change in ", .y, "\n for genes with q-value < 0.05"),
-    filename = here::here("results/map_heatmap", paste0("responses_", .y, ".pdf"))
+    fontsize_col = 15)
   )
-)
+
+
+main = paste0("Fold change in ", .y, "\n for genes with q-value < 0.05"),
+filename = here::here("results/map_heatmap", paste0("responses_", .y, ".pdf")
