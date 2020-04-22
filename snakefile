@@ -9,7 +9,7 @@ rule all:
     variance_stabilized_counts = 'results/tximeta/vsd.Rdata',
     limma_summaries = expand("results/limma_results/significant_contrasts_{tissue}.csv", tissue = TISSUE_TYPES),
     dbscan_clusters = "results/dbscan/cluster_list.Rdata",
-    enrichment = expand("results/gost_enrichment_run/{set}.Rdata", set = ("upregulated_response", "downregulated_response"))
+    enrichment = expand("results/gost_enrichment_format/{set}.csv", set = ("upregulated_response", "downregulated_response"))
 
 rule md5:
   input:
@@ -238,8 +238,14 @@ rule enrichment_run:
     expressed_genes = "results/gost_enrichment_setup/expressed_genes.Rdata"
   output:
     raw_results = "results/gost_enrichment_run/{ranked_list}.Rdata",
-    results_table = "results/gost_enrichment_run/{ranked_list}.csv"
   params: 
-    min_fdr = 0.05
+    max_fdr = 0.05
   script:
     "scripts/gost_enrichment_run.R"
+
+# Format enrichment result to human readable tidy table
+rule enrichment_format:
+  input: "results/gost_enrichment_run/{enrichment_results}.Rdata"
+  output: "results/gost_enrichment_format/{enrichment_results}.csv"
+  script: 
+    "scripts/gost_enrichment_format.R"
