@@ -179,6 +179,8 @@ rule download_gene_data:
     "scripts/download_gene_data.R"
 
 # Summarize differential expression results
+# NOTE: Fold change threshold is log transformed:
+# Specifying a threshold of i.e. 2 fold expression filters all genes with < 1 log2 fold change
 rule limma_results:
   input:
     results = "results/limma/fitted_models.Rdata",

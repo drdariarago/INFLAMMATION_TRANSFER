@@ -11,11 +11,11 @@ limma_results <-
 
 LOG_THRESHOLD = snakemake@params[['fold_change_threshold']] %>% log2
 ALPHA = snakemake@params[['alpha']]
+COEFS = 5:8
 
-## Filter out genes with less than 0.5 change across all LPS contrasts
-## Pick p-values
+# Summarize results and filter by log fold change
 
-limma_global_pvals <-
+limma_results_summary <-
   limma_results %>% 
   map(
     ~ topTable(
@@ -24,23 +24,28 @@ limma_global_pvals <-
       number = Inf, 
       adjust.method = 'none',
       lfc = LOG_THRESHOLD, 
-      coef = 5:8 
-    ) %>%
-    {setNames(object = .$P.Value, nm = rownames(.))}
+      coef = COEFS
+    )
   )
 
-## Subset only gene results that pass initial filtering criteria
+# Extract global p values for initial screening of genes with at least 1 significant contrast
+
+limma_global_pvals <-
+  limma_results_summary %>%
+  map(.f = ~ setNames(.x$P.Value, nm = .x$gene_id))
+
+# Subset only gene results that pass initial filtering criteria
 limma_filtered_results <-
   limma_results %>% 
   map2(
     .x = .,
     .y = limma_global_pvals,
     ~ .x$p.value %>% 
-      magrittr::extract(, 5:8) %>% 
+      magrittr::extract(, COEFS) %>% 
       magrittr::extract(row.names(.) %in% names(.y),)
   )
 
-
+# Create stager object 
 stager_input <-
   map2(
     .x = limma_global_pvals,
