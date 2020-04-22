@@ -6,9 +6,7 @@ import re
 rule all:
   input: 
     multiqc_report = "reports/multiqc/multiqc.html",
-    variance_stabilized_counts = 'results/tximeta/vsd.Rdata',
     limma_summaries = expand("results/limma_results/significant_contrasts_{tissue}.csv", tissue = TISSUE_TYPES),
-    dbscan_clusters = "results/dbscan/cluster_list.Rdata",
     enrichment = expand("results/gost_enrichment_format/{set}.csv", set = ("upregulated_response", "downregulated_response"))
 
 rule md5:
@@ -190,7 +188,7 @@ rule limma_results:
     csv_summaries = expand("results/limma_results/significant_contrasts_{tissue}.csv", tissue = TISSUE_TYPES)
   params:
     fold_change_threshold = 1.5,
-    alpha = 0.05
+    alpha = 0.01
   script:
     "scripts/limma_results.R"
 
@@ -239,7 +237,7 @@ rule enrichment_run:
   output:
     raw_results = "results/gost_enrichment_run/{ranked_list}.Rdata",
   params: 
-    max_fdr = 0.05
+    max_fdr = 0.01
   script:
     "scripts/gost_enrichment_run.R"
 
