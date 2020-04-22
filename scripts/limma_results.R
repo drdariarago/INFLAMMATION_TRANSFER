@@ -22,6 +22,7 @@ limma_global_pvals <-
       .x, 
       sort.by = 'none', 
       number = Inf, 
+      adjust.method = 'none',
       lfc = LOG_THRESHOLD, 
       coef = 5:8 
     ) %>%
@@ -55,7 +56,7 @@ stager_result <-
   stager_input %>% 
   map(
     stageWiseAdjustment,
-    method = 'none',
+    method = 'holm',
     alpha = ALPHA
   )
 
