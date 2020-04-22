@@ -2,39 +2,13 @@ library(tidyverse)
 library(magrittr)
 library(gprofiler2)
 
-# Import fold change values
-gene_list <-
-  snakemake@input[[1]] %>% 
-  readRDS() %>% 
-  map(.x = ., .f = ~ filter(.x, treatment == "exposureLPS")) %>%
-  map(.x = ., .f = ~ dplyr::select(.x, -treatment))  %>% 
-  map(.x = ., .f = ~ mutate(.data = .x, gene_id = gsub('\\..*', '', gene_id))) %>% 
-  map(.x = ., .f = ~ filter(.data = .x, AveExpr > snakemake@params[["expression_threshold"]]) )
-
-# Create list of genes that are expressed in each tissue
+# Import background set of genes expressed in each tissue
 tissue_bg <-
-  map(
-    .x = gene_list,
-    .f = 
-      ~ .x %>% 
-      pull(gene_id) %>% 
-      unique
-  )
+  read_rds(path = snakemake@input[["expressed_genes"]])
 
-# Create list of queries sorted by LogFC for each timepoint
-ranked_gene_list <-
-  gene_list %>% 
-  map(.f = ~ dplyr::arrange(.x, desc(LogFC))) %>% 
-  map(.f = ~ 
-        mutate(.data = .x,
-               timepoint = fct_relevel(
-                 timepoint,
-                 c("timepoint2", "timepoint5", "timepoint12", "timepoint24") 
-               )
-        )
-  ) %>% 
-  map(.f = ~ split(x = .x, f = .x$timepoint)) %>% 
-  modify_depth(.depth = 2, .f = ~ pull(.data = .x, gene_id))
+# Import list of ranked gene names
+ranked_gene_list <- 
+  read_rds(path = snakemake@input[["ranked_genes"]])
 
 # Run GO enrichment
 gost_result_list <-

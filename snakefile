@@ -9,7 +9,7 @@ rule all:
     variance_stabilized_counts = 'results/tximeta/vsd.Rdata',
     limma_summaries = expand("results/limma_results/significant_contrasts_{tissue}.csv", tissue = TISSUE_TYPES),
     dbscan_clusters = "results/dbscan/cluster_list.Rdata",
-    enrichment_results = "results/gost_enrichment/enrichment_tables.csv"
+    enrichment = expand("results/gost_enrichment_run/{set}.Rdata", set = ("upregulated_response", "downregulated_response"))
 
 rule md5:
   input:
@@ -218,15 +218,28 @@ rule vsd:
   script:
     'scripts/vsd.R'
 
-# Find GO and other enrichment terms across limma results
-rule enrichment:
+# Rank genes by ascending and descending LogFC expression
+rule enrichment_setup:
   input: 
     "results/limma/limma_coefs.Rdata"
   output:
-    raw_results = "results/gost_enrichment/enrichment_results.Rdata",
-    results_table = "results/gost_enrichment/enrichment_tables.csv"
+    expressed_genes = "results/gost_enrichment_setup/expressed_genes.Rdata",
+    genes_descending_lfc = "results/gost_enrichment_setup/upregulated_response.Rdata",
+    genes_ascending_lfc = "results/gost_enrichment_setup/downregulated_response.Rdata"
   params:
-    expression_threshold = 0,
+    expression_threshold = 0
+  script:
+    'scripts/gost_enrichment_setup.R'
+
+# Perform enrichment across all ranked sets of genes
+rule enrichment_run:
+  input:
+    ranked_genes = "results/gost_enrichment_setup/{ranked_list}.Rdata",
+    expressed_genes = "results/gost_enrichment_setup/expressed_genes.Rdata"
+  output:
+    raw_results = "results/gost_enrichment_run/{ranked_list}.Rdata",
+    results_table = "results/gost_enrichment_run/{ranked_list}.csv"
+  params: 
     min_fdr = 0.05
   script:
-    'scripts/gost_enrichment.R'
+    "scripts/gost_enrichment_run.R"
