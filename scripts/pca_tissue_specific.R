@@ -1,12 +1,13 @@
 library(tidyverse)
 library(magrittr)
+library(DESeq2)
+
+#https://bioconductor.org/packages/release/bioc/vignettes/SummarizedExperiment/inst/doc/SummarizedExperiment.html#subsetting
 
 #Using expression results because VSD gives less confidences for genes with low counts
 
 experiment_data <-
-  readRDS(here::here("results/tximeta/expression_results.Rdata"))
-
-#https://bioconductor.org/packages/release/bioc/vignettes/SummarizedExperiment/inst/doc/SummarizedExperiment.html#subsetting
+  readRDS(here::here("results/tximeta/vsd.Rdata"))
 
 # Subset just counts
 
@@ -60,12 +61,36 @@ meta <-
 
 pca_joined <-
   pca_data %>%
-  full_join(x = ., y = meta,
+  left_join(x = ., y = meta,
             by = c("sample_id")) %>%
-  .[1:414,] %>%
-  .[.$exposure %in% c("LPS", "ctr"),]
+  filter(
+    exposure %in% c("LPS", "ctr")
+  )
 
 # PCAs
+pca_labels <-
+  purrr::set_names(
+    x = paste(
+      names(pca_variance[[1]]),
+      pca_variance$PC3,
+      pca_variance$PC4,
+      sep = "\n"
+    ), 
+    nm = names(pca_variance[[1]])
+  )
+
+# Separating by timepoint 
+ggplot(pca_joined) +
+  geom_point(
+    aes(
+      x = PC3, y = PC4, shape = maternal_fetal, color = exposure),
+    alpha = 0.8, size = 3) +
+  facet_grid(
+    timepoint ~ contrast,
+    labeller = labeller(contrast = pca_labels)) + 
+  scale_colour_brewer(type = 'qual', palette = 7)
+
+
 pca_labels <-
   purrr::set_names(
     x = paste(
@@ -77,9 +102,13 @@ pca_labels <-
     nm = names(pca_variance[[1]])
   )
 
+# Separating by exposure, timepoint discrete
 ggplot(pca_joined) +
-  geom_point(aes(
-    x = PC1, y = PC2, col = maternal_fetal, shape = exposure)) +
+  geom_point(
+    aes(
+      x = PC1, y = PC2, shape = maternal_fetal, color = timepoint),
+    alpha = 0.8, size = 3) +
   facet_grid(
-    timepoint ~ contrast,
-    labeller = labeller(contrast = pca_labels))
+    exposure ~ contrast,
+    labeller = labeller(contrast = pca_labels)) + 
+  scale_colour_viridis_c()
