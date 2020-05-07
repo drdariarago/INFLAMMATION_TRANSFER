@@ -42,11 +42,20 @@ placentas_data$samples <-
 
 design <- 
   model.matrix(
-    object = formula( ~ maternal * timepoint + timepoint:exposure + maternal:timepoint:exposure ),
-    contrasts.arg = list( timepoint = "contr.treatment"),
+    object = formula( ~ 0 + timepoint * exposure * maternal),
+    contrasts.arg = list( 
+      timepoint = contr.treatment(n = 4, base = 2),
+      maternal = "contr.sum", 
+      exposure = "contr.sum"
+    ),
     data = placentas_data$samples
   )
 
+design_check <-
+  design %>% 
+  set_rownames(placentas_data$samples[ ,1])
+
+colnames(design_check)
 
 # Filter low expression genes and apply voom transformation
 
@@ -73,6 +82,50 @@ linear_model <-
   eBayes()
 
 write_rds(linear_model, here::here("results/limma_placentas/linear_model.Rdata"))
+
+# Check distribution of q-values across different types of factors
+
+qvalues <- 
+  linear_model %$% 
+  p.value %>% 
+  as_tibble(x = ., rownames = 'gene_id') %>% 
+  pivot_longer(data = ., cols = -contains('gene'), names_to = 'contrast', values_to = 'p_value') %>% 
+  mutate(
+    q_value = fdrtool::fdrtool(x = p_value, statistic = 'pvalue') %$% qval,
+    contrast = factor(
+      x = contrast, 
+      levels = c(
+        "maternal1", 
+        "exposure1",
+        "exposure1:maternal1",
+        paste("timepoint", c(2,5,12,24), sep = ""),
+        paste("timepoint", 1:4, ":exposure1", sep = ""),
+        paste("timepoint", 1:4, ":maternal1", sep = ""),
+        paste("timepoint", 1:4, ":exposure1", ":maternal1", sep = "")
+      )),
+    maternal = factor(x = grepl(pattern = "maternal", x = contrast), labels = c('other', 'maternal')),
+    exposure = factor(x = grepl(pattern = "exposure", x = contrast), labels = c('other', 'exposure'))
+  )
+
+# Plot q-value distribution
+
+q_distribution <-
+  qvalues %>% 
+  ggplot(data = ., mapping = aes(x = q_value, fill = contrast)) +
+  geom_histogram(position = 'dodge', binwidth = 0.08) +
+  facet_grid(exposure ~ maternal, switch = 'y') +
+  scale_fill_manual(values = viridis::viridis(16)) 
+
+q_distribution
+
+ggsave(filename = here::here('results/limma_placentas/q_value_distribution.pdf'))
+
+# Zoom to focus on interaction terms
+
+q_distribution +
+  coord_cartesian(ylim = c(0,6000)) 
+
+ggsave(filename = here::here('results/limma_placentas/q_value_distribution_zoomed.pdf'))
 
 # Summarize results
 limma_coefs <-
