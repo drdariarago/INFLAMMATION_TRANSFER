@@ -44,7 +44,7 @@ design <-
   model.matrix(
     object = formula( ~ 0 + timepoint * exposure * maternal),
     contrasts.arg = list( 
-      timepoint = contr.treatment(n = 4, base = 2),
+      timepoint = "contr.treatment",
       maternal = "contr.sum", 
       exposure = "contr.sum"
     ),
@@ -85,7 +85,7 @@ write_rds(linear_model, here::here("results/limma_placentas/linear_model.Rdata")
 
 # Check distribution of q-values across different types of factors
 
-qvalues <- 
+q_values <- 
   linear_model %$% 
   p.value %>% 
   as_tibble(x = ., rownames = 'gene_id') %>% 
@@ -99,9 +99,9 @@ qvalues <-
         "exposure1",
         "exposure1:maternal1",
         paste("timepoint", c(2,5,12,24), sep = ""),
-        paste("timepoint", 1:4, ":exposure1", sep = ""),
-        paste("timepoint", 1:4, ":maternal1", sep = ""),
-        paste("timepoint", 1:4, ":exposure1", ":maternal1", sep = "")
+        paste("timepoint", c(2,5,12,24), ":exposure1", sep = ""),
+        paste("timepoint", c(2,5,12,24), ":maternal1", sep = ""),
+        paste("timepoint", c(2,5,12,24), ":exposure1", ":maternal1", sep = "")
       )),
     maternal = factor(x = grepl(pattern = "maternal", x = contrast), labels = c('other', 'maternal')),
     exposure = factor(x = grepl(pattern = "exposure", x = contrast), labels = c('other', 'exposure'))
@@ -110,63 +110,53 @@ qvalues <-
 # Plot q-value distribution
 
 q_distribution <-
-  qvalues %>% 
+  q_values %>% 
   ggplot(data = ., mapping = aes(x = q_value, fill = contrast)) +
   geom_histogram(position = 'dodge', binwidth = 0.08) +
   facet_grid(exposure ~ maternal, switch = 'y') +
-  scale_fill_manual(values = viridis::viridis(16)) 
+  scale_fill_manual(values = viridis::viridis(16)) +
+  ggtitle(label = 'q-value distribution of different placenta contrasts')
 
 q_distribution
 
-ggsave(filename = here::here('results/limma_placentas/q_value_distribution.pdf'))
+ggsave(filename = here::here('results/limma_placentas/q_value_distribution.pdf'), 
+       width = 297, height = 210, units = 'mm')
 
 # Zoom to focus on interaction terms
 
 q_distribution +
   coord_cartesian(ylim = c(0,6000)) 
 
-ggsave(filename = here::here('results/limma_placentas/q_value_distribution_zoomed.pdf'))
+ggsave(filename = here::here('results/limma_placentas/q_value_distribution_zoomed.pdf'), 
+       width = 297, height = 210, units = 'mm')
 
-# Summarize results
-limma_coefs <-
-  linear_model %>% 
-  topTable(number = Inf) %>% 
-  dplyr::select(contains("LPS")) %>% 
-  rownames_to_column("gene_id") %>% 
-  rename_at(
-    .vars = vars(matches("^timepoint")), 
-    .funs =  ~ paste0("maternal.", .)
-  ) %>% 
-  pivot_longer(
-    cols = contains("LPS"),
-    names_to = c("maternal", "timepoint"),
-    names_pattern = "([a-z]*)[.]timepoint([0-9]{1,2})",
-    values_to = "expression"
-  ) %>% 
+# Merge with fold change values and save as table
+fold_change <- 
+  linear_model %$%
+  coefficients %>% 
+  as_tibble(x = ., rownames = 'gene_id') %>% 
+  pivot_longer(data = ., cols = -contains('gene'), names_to = 'contrast', values_to = 'logFC') %>% 
   mutate(
-    timepoint = factor(x = timepoint, levels = c(2,5,12,24)),
-    maternal = factor(x = maternal, levels = c("maternal", "maternalfetal"), labels = c("maternal", "fetal"))
+    contrast = factor(
+      x = contrast, 
+      levels = c(
+        "maternal1", 
+        "exposure1",
+        "exposure1:maternal1",
+        paste("timepoint", c(2,5,12,24), sep = ""),
+        paste("timepoint", c(2,5,12,24), ":exposure1", sep = ""),
+        paste("timepoint", c(2,5,12,24), ":maternal1", sep = ""),
+        paste("timepoint", c(2,5,12,24), ":exposure1", ":maternal1", sep = "")
+      )
+    )
   )
 
-limma_qvals <-
-  linear_model$p.value %>% 
-  as_tibble(rownames = "gene_id") %>% 
-  dplyr::select(matches(".*(LPS|gene).*")) %>% 
-  rename_at(
-    .vars = vars(matches("^timepoint")), 
-    .funs =  ~ paste0("maternal.", .)
-  ) %>% 
-  pivot_longer(
-    cols = contains("LPS"),
-    names_to = c("maternal", "timepoint"),
-    names_pattern = "([a-z]*)[:.]timepoint([0-9]{1,2})",
-    values_to = "pval"
-  ) %>% 
-  mutate(
-    timepoint = factor(x = timepoint, levels = c(2,5,12,24)),
-    maternal = factor(x = maternal, levels = c("maternal", "maternalfetal"), labels = c("maternal", "fetal")),
-    qval = fdrtool::fdrtool(x = pval, statistic = "pvalue") %$% lfdr
-  )
+result_summary_table <-
+  full_join(
+  x = q_values %>% dplyr::select(c('gene_id', 'contrast', 'q_value')),
+  y = fold_change,
+  by = c('gene_id', 'contrast')
+)
 
-limma_results <- full_join(limma_coefs, limma_qvals)
-write_rds(x = limma_results, path = here::here("results/limma_placentas/limma_placenta_results.Rdata"))
+write_csv(x = result_summary_table, path = here::here('results/limma_placentas/placenta_fold_change_summary.csv'))
+write_rds(x = result_summary_table, path = here::here('results/limma_placentas/placenta_fold_change_summary.rds'))
