@@ -55,7 +55,7 @@ design_check <-
   design %>% 
   set_rownames(placentas_data$samples[ ,1])
 
-print(x = "Performing the following contrasts: \n")
+print(x = "Performing the following contrasts:")
 colnames(design_check)
 
 # 3 way interaction: the residual response of maternal placenta. 
@@ -63,7 +63,7 @@ colnames(design_check)
 # Negative for exposed foetal placenta, positive for foetal controls
 # High values mean greater response in maternal than in fetal placenta and vice versa
 
-write_csv(x = design_check, path = snakemake@output[['factor_design_matrix']])
+write_csv(x = as.data.frame(design_check), path = snakemake@output[['factor_design_matrix']])
 
 # Filter low expression genes and apply voom transformation
 
@@ -93,6 +93,8 @@ write_rds(linear_model, snakemake@output[['linear_models']])
 
 # Check distribution of q-values across different types of factors
 
+pdf(file = snakemake@output[['fdr_plot']], width = 8.3, height = 11.7)
+
 q_values <- 
   linear_model %$% 
   p.value %>% 
@@ -104,16 +106,16 @@ q_values <-
       x = contrast, 
       levels = c(
         "maternal1", 
-        "exposure1",
-        "exposure1:maternal1",
         paste("timepoint", c(2,5,12,24), sep = ""),
         paste("timepoint", c(2,5,12,24), ":exposure1", sep = ""),
         paste("timepoint", c(2,5,12,24), ":maternal1", sep = ""),
-        paste("timepoint", c(2,5,12,24), ":exposure1", ":maternal1", sep = "")
+        paste("timepoint", c(2,5,12,24), ":maternal1", ":exposure1", sep = "")
       )),
     maternal = factor(x = grepl(pattern = "maternal", x = contrast), labels = c('other', 'maternal')),
     exposure = factor(x = grepl(pattern = "exposure", x = contrast), labels = c('other', 'exposure'))
   )
+
+dev.off()
 
 # Plot q-value distribution
 
@@ -154,7 +156,7 @@ fold_change <-
         paste("timepoint", c(2,5,12,24), sep = ""),
         paste("timepoint", c(2,5,12,24), ":exposure1", sep = ""),
         paste("timepoint", c(2,5,12,24), ":maternal1", sep = ""),
-        paste("timepoint", c(2,5,12,24), ":exposure1", ":maternal1", sep = "")
+        paste("timepoint", c(2,5,12,24), ":maternal1", ":exposure1", sep = "")
       )
     )
   )
