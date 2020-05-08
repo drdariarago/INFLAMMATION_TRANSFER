@@ -7,6 +7,7 @@ rule all:
   input: 
     multiqc_report = "reports/multiqc/multiqc.html",
     limma_summaries = expand("results/limma_results/significant_contrasts_{tissue}.csv", tissue = TISSUE_TYPES),
+    linear_model_placentas = "results/limma_placentas/linear_model.Rdata",
     enrichment = expand("results/gost_enrichment_format/{set}.csv", set = ("upregulated_response", "downregulated_response"))
 
 rule md5:
@@ -175,6 +176,19 @@ rule limma:
     limma_coefs = "results/limma/limma_coefs.Rdata"
   script:
     "scripts/limma.R"
+
+# Fit linear models for the 2 placentas
+rule limma_placentas:
+  input:
+    "results/tximeta/expression_results.Rdata"
+  output:
+    linear_models = "results/limma_placentas/linear_model.Rdata",
+    q_values_plot = "results/limma_placentas/q_value_distribution.pdf",
+    q_values_plot_zoomed = "results/limma_placentas/q_value_distribution_zoomed.pdf",
+    summary_csv = "results/limma_placentas/placenta_fold_change_summary.csv",
+    summary_rds = "results/limma_placentas/placenta_fold_change_summary.rds"
+  script:
+    "scripts/limma_placentas.R"
 
 # Summarize differential expression results
 # NOTE: Fold change threshold is log transformed:

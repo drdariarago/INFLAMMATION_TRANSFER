@@ -7,7 +7,7 @@ library(magrittr)
 library(tidyverse)
 
 experiment_data <-
-  here::here("results/tximeta/expression_results.Rdata") %>%
+  snakemake@input[[1]] %>%
   readRDS() %>%
   {DGEList(
     counts  = assays(.) %>% extract2("counts"),
@@ -63,7 +63,7 @@ filtered_data <-
   filterByExpr(
     y = placentas_data, 
     design = design, 
-    min.count = 15,
+    min.count = snakemake@params[['min_counts']],
     min.total.count = 1
   ) %>% 
   placentas_data[., , keep.lib.sizes = T] %>% 
@@ -81,7 +81,7 @@ linear_model <-
     ) %>% 
   eBayes()
 
-write_rds(linear_model, here::here("results/limma_placentas/linear_model.Rdata"))
+write_rds(linear_model, snakemake@output[['linear_models']])
 
 # Check distribution of q-values across different types of factors
 
@@ -119,7 +119,7 @@ q_distribution <-
 
 q_distribution
 
-ggsave(filename = here::here('results/limma_placentas/q_value_distribution.pdf'), 
+ggsave(filename = snakemake@output[['q_values_plot']], 
        width = 297, height = 210, units = 'mm')
 
 # Zoom to focus on interaction terms
@@ -127,7 +127,7 @@ ggsave(filename = here::here('results/limma_placentas/q_value_distribution.pdf')
 q_distribution +
   coord_cartesian(ylim = c(0,6000)) 
 
-ggsave(filename = here::here('results/limma_placentas/q_value_distribution_zoomed.pdf'), 
+ggsave(filename = snakemake@output[['q_values_plot_zoomed']], 
        width = 297, height = 210, units = 'mm')
 
 # Merge with fold change values and save as table
@@ -158,5 +158,5 @@ result_summary_table <-
   by = c('gene_id', 'contrast')
 )
 
-write_csv(x = result_summary_table, path = here::here('results/limma_placentas/placenta_fold_change_summary.csv'))
-write_rds(x = result_summary_table, path = here::here('results/limma_placentas/placenta_fold_change_summary.rds'))
+write_csv(x = result_summary_table, path = snakemake@output[['summary_csv']])
+write_rds(x = result_summary_table, path = snakemake@output[['summary_rds']])
