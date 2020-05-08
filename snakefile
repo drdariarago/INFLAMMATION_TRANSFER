@@ -156,6 +156,15 @@ rule tximeta:
   script:
     "scripts/tximeta.R"
 
+# Download gene symbols and description
+rule download_gene_data:
+  input:
+    "results/tximeta/variance_stabilized_counts.csv"
+  output:
+    "results/download_gene_data/gene_names.Rdata"
+  script:
+    "scripts/download_gene_data.R"
+
 # Fit simple linear models via limma
 rule limma:
   input:
@@ -166,15 +175,6 @@ rule limma:
     limma_coefs = "results/limma/limma_coefs.Rdata"
   script:
     "scripts/limma.R"
-
-# Download gene symbols and description
-rule download_gene_data:
-  input:
-    "results/tximeta/variance_stabilized_counts.csv"
-  output:
-    "results/download_gene_data/gene_names.Rdata"
-  script:
-    "scripts/download_gene_data.R"
 
 # Summarize differential expression results
 # NOTE: Fold change threshold is log transformed:
