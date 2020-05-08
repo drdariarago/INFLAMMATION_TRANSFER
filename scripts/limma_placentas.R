@@ -30,9 +30,9 @@ placentas_data <-
 placentas_data$samples <-
   placentas_data$samples %>% 
   mutate(
-    exposure = droplevels(exposure),
+    exposure = exposure %>% droplevels() %>% factor(x = ., levels = c('LPS', 'ctr')),
     tissue = tissue %>% as.factor() %>% droplevels(),
-    maternal = maternal_fetal %>% as.factor(),
+    maternal = maternal_fetal %>% factor(x = ., levels = c('maternal', 'fetal')),
     timepoint = factor(x = placentas_data$samples$timepoint, levels = c(2,5,12,24))
   )
 
@@ -42,9 +42,9 @@ placentas_data$samples <-
 
 design <- 
   model.matrix(
-    object = formula( ~ 0 + timepoint * exposure * maternal),
+    object = formula( ~ 0 + timepoint / (maternal * exposure)  ),
     contrasts.arg = list( 
-      timepoint = "contr.treatment",
+      timepoint = "contr.sum",
       maternal = "contr.sum", 
       exposure = "contr.sum"
     ),
@@ -55,7 +55,15 @@ design_check <-
   design %>% 
   set_rownames(placentas_data$samples[ ,1])
 
+print(x = "Performing the following contrasts: \n")
 colnames(design_check)
+
+# 3 way interaction: the residual response of maternal placenta. 
+# Positive for exposed maternal placentas, negative for maternal controls
+# Negative for exposed foetal placenta, positive for foetal controls
+# High values mean greater response in maternal than in fetal placenta and vice versa
+
+write_csv(x = design_check, path = snakemake@output[['factor_design_matrix']])
 
 # Filter low expression genes and apply voom transformation
 

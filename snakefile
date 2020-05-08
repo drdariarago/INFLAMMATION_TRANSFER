@@ -182,11 +182,14 @@ rule limma_placentas:
   input:
     "results/tximeta/expression_results.Rdata"
   output:
+    factor_design_matrix = "results/limma_placentas/factor_design_matrix.csv"
     linear_models = "results/limma_placentas/linear_model.Rdata",
     q_values_plot = "results/limma_placentas/q_value_distribution.pdf",
     q_values_plot_zoomed = "results/limma_placentas/q_value_distribution_zoomed.pdf",
     summary_csv = "results/limma_placentas/placenta_fold_change_summary.csv",
     summary_rds = "results/limma_placentas/placenta_fold_change_summary.rds"
+  params:
+    min_counts = 15
   script:
     "scripts/limma_placentas.R"
 
