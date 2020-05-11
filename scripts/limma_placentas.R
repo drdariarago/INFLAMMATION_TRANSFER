@@ -22,7 +22,6 @@ experiment_data <-
   .[,.$samples$exposure != "TiO2"] %>% 
   calcNormFactors(method = "TMM")
 
-
 # Subset only the placentas
 placentas_data <- 
   experiment_data[, experiment_data$samples$tissue == "placenta"]
@@ -151,14 +150,15 @@ fold_change <-
       x = contrast, 
       levels = c(
         "maternal1", 
-        "exposure1",
-        "exposure1:maternal1",
         paste("timepoint", c(2,5,12,24), sep = ""),
         paste("timepoint", c(2,5,12,24), ":exposure1", sep = ""),
         paste("timepoint", c(2,5,12,24), ":maternal1", sep = ""),
         paste("timepoint", c(2,5,12,24), ":maternal1", ":exposure1", sep = "")
       )
-    )
+    ),
+    timepoint = factor(x = str_extract(string = contrast, pattern = 'timepoint[0-9]{1,2}'), levels = paste('timepoint', c(2,5,12,24), sep = "")),
+    maternal = factor(x = grepl(pattern = 'maternal', x = contrast), levels = c(F,T), labels = c('shared', 'difference')),
+    exposure = factor(x = grepl(pattern = 'exposure', x = contrast), levels = c(F,T), labels = c('baseline', 'response'))
   )
 
 result_summary_table <-
@@ -168,5 +168,56 @@ result_summary_table <-
   by = c('gene_id', 'contrast')
 )
 
+## Volcano plot for each contrast type
+ggplot(result_summary_table, 
+       aes(x = logFC, y = q_value, col = abs(logFC) > snakemake@params[['fold_change_threshold']])
+       ) +
+  facet_grid(timepoint ~ exposure + maternal) +
+  geom_point(alpha = 0.3) + 
+  scale_y_continuous(trans = 'log10', oob = scales::squish) +
+  scale_x_continuous(breaks = seq(-5,5,2), minor_breaks = seq(-4,4,2)) +
+  coord_cartesian(xlim = c(-5,5), ylim = c(1E-13,1)) +
+  scale_color_brewer(type = 'qual', direction = -1) +
+  geom_hline(aes(yintercept = snakemake@params[['alpha']])) +
+  ggtitle(label = 'q-value vs fold change across different contrasts')
+
+ggsave(filename = snakemake@output[['volcano_plots']], width = 11.7, height = 8.3, units = "in")
+
+
+# Save gene-wise summaries 
+
 write_csv(x = result_summary_table, path = snakemake@output[['summary_csv']])
 write_rds(x = result_summary_table, path = snakemake@output[['summary_rds']])
+
+# Create ranked gene lists for GO enrichment analysis
+
+fold_change_grouped_tibble <-
+  fold_change %>% 
+  filter(grepl(pattern = 'exposure', x = contrast)) %>% 
+  group_by(contrast)
+
+# Sort genes from highest to lowest FC to detect upregulation in pathways
+fold_change_upregulated_genes <-
+  fold_change_grouped_tibble %>% 
+  arrange(-logFC, .by_group = TRUE) %>% 
+  group_map(
+    .f = ~ pull(.x, gene_id)
+  ) %>% 
+  set_names(
+    group_keys(fold_change_grouped_tibble) %>% pull(contrast)
+  )
+  
+write_rds(x = fold_change_upregulated_genes, path = snakemake@output[['ranked_genes_upregulated']])
+
+# Sort genes from lowest to highest FC to detect downregulation in pathways
+fold_change_downregulated_genes <-
+  fold_change_grouped_tibble %>% 
+  arrange(logFC, .by_group = TRUE) %>% 
+  group_map(
+    .f = ~ pull(.x, gene_id)
+  ) %>% 
+  set_names(
+    group_keys(fold_change_grouped_tibble) %>% pull(contrast)
+  )
+
+write_rds(x = fold_change_downregulated_genes, path = snakemake@output[['ranked_genes_downregulated']])

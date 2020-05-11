@@ -183,14 +183,19 @@ rule limma_placentas:
     "results/tximeta/expression_results.Rdata"
   output:
     factor_design_matrix = "results/limma_placentas/factor_design_matrix.csv",
-    linear_models = "results/limma_placentas/linear_model.Rdata",
+    linear_models = "results/limma_placentas/fitted_model.Rdata",
     fdr_plot = "results/limma_placentas/fdr_plot.pdf",
     q_values_plot = "results/limma_placentas/q_value_distribution.pdf",
     q_values_plot_zoomed = "results/limma_placentas/q_value_distribution_zoomed.pdf",
-    summary_csv = "results/limma_placentas/placenta_fold_change_summary.csv",
-    summary_rds = "results/limma_placentas/placenta_fold_change_summary.rds"
+    volcano_plots = "results/limma_placentas/volcano_plots.pdf",
+    summary_csv = "results/limma_placentas/fold_change_summary.csv",
+    summary_rds = "results/limma_placentas/fold_change_summary.rds",
+    ranked_genes_upregulated = "results/limma_placentas/ranked_list_upregulated_genes.rds",
+    ranked_genes_downregulated = "results/limma_placentas/ranked_list_downregulated_genes.rds"
   params:
-    min_counts = 15
+    min_counts = 5,
+    fold_change_threshold = 0.5,
+    alpha = 0.05
   script:
     "scripts/limma_placentas.R"
 
@@ -224,7 +229,7 @@ rule vsd:
 # Rank genes by ascending and descending LogFC expression
 rule enrichment_setup:
   input: 
-    "results/limma/limma_coefs.Rdata"
+    "results/limma_placentas/placenta_fold_change_summary.rds"
   output:
     expressed_genes = "results/gost_enrichment_setup/expressed_genes.Rdata",
     genes_descending_lfc = "results/gost_enrichment_setup/upregulated_response.Rdata",
@@ -233,6 +238,18 @@ rule enrichment_setup:
     expression_threshold = 0
   script:
     'scripts/gost_enrichment_setup.R'
+
+# Rank genes by ascending and descending LogFC expression
+rule enrichment_setup_placentas:
+  input: 
+    "results/limma_placentas/placenta_fold_change_summary.rds"
+  output:
+    expressed_genes = "results/gost_enrichment_setup_placentas/expressed_genes.Rdata",
+    genes_descending_lfc = "results/gost_enrichment_setup_placentas/upregulated_response.Rdata",
+    genes_ascending_lfc = "results/gost_enrichment_setup_placentas/downregulated_response.Rdata"
+  script:
+    'scripts/gost_enrichment_setup_placentas.R'
+
 
 # Perform enrichment across all ranked sets of genes
 rule enrichment_run:
