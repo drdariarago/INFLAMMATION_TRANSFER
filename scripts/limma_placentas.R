@@ -161,12 +161,24 @@ fold_change <-
     exposure = factor(x = grepl(pattern = 'exposure', x = contrast), levels = c(F,T), labels = c('baseline', 'response'))
   )
 
+# Collate summary table with q-values, fold change and gene symbols
+
+gene_annotation <- 
+  read_rds(snakemake@input[["gene_data"]])
+
 result_summary_table <-
   full_join(
   x = q_values %>% dplyr::select(c('gene_id', 'contrast', 'q_value')),
   y = fold_change,
   by = c('gene_id', 'contrast')
-)
+) %>%
+  mutate(gene_id = gsub(pattern = "\\..*", x = gene_id, replacement = "")) %>% 
+  right_join(
+    x = gene_annotation %>% dplyr::select(c('ensembl_gene_id', 'mgi_symbol')),
+    y = .,
+    by = c("ensembl_gene_id" = "gene_id")
+  )
+
 
 ## Volcano plot for each contrast type
 ggplot(result_summary_table, 
@@ -179,10 +191,10 @@ ggplot(result_summary_table,
   coord_cartesian(xlim = c(-5,5), ylim = c(1E-13,1)) +
   scale_color_brewer(type = 'qual', direction = -1) +
   geom_hline(aes(yintercept = snakemake@params[['alpha']])) + 
-  labs(col = 'Absolute Log Fold Change over 0.5') + 
+  labs(col = 'Absolute LogFC over 0.5') + 
   ggtitle(label = 'q-value vs fold change across different contrasts')
 
-ggsave(filename = snakemake@output[['volcano_plots']], width = 11.7, height = 8.3, units = "in")
+ggsave(filename = snakemake@output[['volcano_plots']], width = 11.7, height = 8.3, units = "in", device = 'png', dpi = 'retina')
 
 
 # Save gene-wise summaries 
@@ -195,6 +207,7 @@ write_rds(x = result_summary_table, path = snakemake@output[['summary_rds']])
 fold_change_grouped_tibble <-
   fold_change %>% 
   filter(grepl(pattern = 'exposure', x = contrast)) %>% 
+  mutate(gene_id = gsub(pattern = "\\..*", x = gene_id, replacement = "")) %>% 
   group_by(contrast)
 
 # Sort genes from highest to lowest FC to detect upregulation in pathways
