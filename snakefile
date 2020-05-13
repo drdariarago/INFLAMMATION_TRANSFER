@@ -1,14 +1,18 @@
 fastq_files, = glob_wildcards('data/02_seqdata/{filename}.fq.gz')
 TISSUE_TYPES = ("placenta_maternal", "lung_maternal", "liver_maternal", "liver_fetal", "placenta_fetal")
+MODELS = ("placentas")
 
 import re
 
 rule all:
   input: 
     multiqc_report = "reports/multiqc/multiqc.html",
-    limma_summaries = expand("results/limma_results/significant_contrasts_{tissue}.csv", tissue = TISSUE_TYPES),
-    linear_model_placentas = "results/limma_placentas/linear_model.Rdata",
-    enrichment = expand("results/gost_enrichment_format/{set}.csv", set = ("upregulated_response", "downregulated_response"))
+    linear_model_placentas = "results/limma_placentas/fitted_model.Rdata",
+    gsea_enrichment = 
+      expand("results/gost_enrichment_run_{tissue}/gost_results_{up_or_down}.rds", 
+        tissue = MODELS, 
+        up_or_down = ("upregulated", "downregulated")
+      )
 
 rule md5:
   input:
@@ -226,40 +230,14 @@ rule vsd:
   script:
     'scripts/vsd.R'
 
-# Rank genes by ascending and descending LogFC expression
-rule enrichment_setup:
-  input: 
-    "results/limma_placentas/placenta_fold_change_summary.rds"
-  output:
-    expressed_genes = "results/gost_enrichment_setup/expressed_genes.Rdata",
-    genes_descending_lfc = "results/gost_enrichment_setup/upregulated_response.Rdata",
-    genes_ascending_lfc = "results/gost_enrichment_setup/downregulated_response.Rdata"
-  params:
-    expression_threshold = 0
-  script:
-    'scripts/gost_enrichment_setup.R'
-
-# Rank genes by ascending and descending LogFC expression
-rule enrichment_setup_placentas:
-  input: 
-    "results/limma_placentas/placenta_fold_change_summary.rds"
-  output:
-    expressed_genes = "results/gost_enrichment_setup_placentas/expressed_genes.Rdata",
-    genes_descending_lfc = "results/gost_enrichment_setup_placentas/upregulated_response.Rdata",
-    genes_ascending_lfc = "results/gost_enrichment_setup_placentas/downregulated_response.Rdata"
-  script:
-    'scripts/gost_enrichment_setup_placentas.R'
-
-
 # Perform enrichment across all ranked sets of genes
 rule enrichment_run:
   input:
-    ranked_genes = "results/gost_enrichment_setup/{ranked_list}.Rdata",
-    expressed_genes = "results/gost_enrichment_setup/expressed_genes.Rdata"
+    ranked_genes = "results/limma_{model}/ranked_list_{up_or_down}_genes.rds"
   output:
-    raw_results = "results/gost_enrichment_run/{ranked_list}.Rdata",
+    raw_results = "results/gost_enrichment_run_{model}/gost_results_{up_or_down}.rds"
   params: 
-    max_fdr = 0.01
+    max_fdr = 0.05
   script:
     "scripts/gost_enrichment_run.R"
 
