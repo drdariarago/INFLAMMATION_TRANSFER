@@ -7,7 +7,7 @@ library(magrittr)
 library(tidyverse)
 
 experiment_data <-
-  snakemake@input[[1]] %>%
+  snakemake@input[['expression_results']] %>%
   readRDS() %>%
   {DGEList(
     counts  = assays(.) %>% extract2("counts"),
@@ -164,7 +164,7 @@ fold_change <-
 # Collate summary table with q-values, fold change and gene symbols
 
 gene_annotation <- 
-  read_rds(snakemake@input[["gene_data"]])
+  read_rds(snakemake@input[['gene_data']])
 
 result_summary_table <-
   full_join(
