@@ -2,6 +2,10 @@ fastq_files, = glob_wildcards('data/02_seqdata/{filename}.fq.gz')
 TISSUE_TYPES = ("placenta_maternal", "lung_maternal", "liver_maternal", "liver_fetal", "placenta_fetal")
 MODELS = ("placentas")
 
+MIN_COUNTS = 5
+ALPHA = 0.05
+MIN_LOGFC = 0.5
+
 import re
 
 rule all:
@@ -198,9 +202,9 @@ rule limma_placentas:
     ranked_genes_upregulated = "results/limma_placentas/ranked_list_upregulated_genes.rds",
     ranked_genes_downregulated = "results/limma_placentas/ranked_list_downregulated_genes.rds"
   params:
-    min_counts = 5,
-    fold_change_threshold = 0.5,
-    alpha = 0.05
+    min_counts = MIN_COUNTS,
+    fold_change_threshold = MIN_LOGFC,
+    alpha = ALPHA
   script:
     "scripts/limma_placentas.R"
 
@@ -222,7 +226,7 @@ rule enrichment_run:
   output:
     raw_results = "results/gost_enrichment_run_{model}/gost_results_{up_or_down}.rds"
   params: 
-    max_fdr = 0.05
+    max_fdr = ALPHA
   script:
     "scripts/gost_enrichment_run.R"
 
