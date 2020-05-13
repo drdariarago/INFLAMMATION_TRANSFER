@@ -203,22 +203,6 @@ rule limma_placentas:
   script:
     "scripts/limma_placentas.R"
 
-# Summarize differential expression results
-# NOTE: Fold change threshold is log transformed:
-# Specifying a threshold of i.e. 2 fold expression filters all genes with < 1 log2 fold change
-rule limma_results:
-  input:
-    results = "results/limma/fitted_models.Rdata",
-    gene_data = "results/download_gene_data/gene_names.Rdata"
-  output:
-    r_summaries = "results/limma_results/annotated_results.Rdata",
-    csv_summaries = expand("results/limma_results/significant_contrasts_{tissue}.csv", tissue = TISSUE_TYPES)
-  params:
-    fold_change_threshold = 1.5,
-    alpha = 0.01
-  script:
-    "scripts/limma_results.R"
-
 # Create variance stabilized counts for exploratory plotting
 rule vsd:
   input:
