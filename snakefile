@@ -196,7 +196,7 @@ rule limma_placentas:
     fdr_plot = "results/limma_placentas/fdr_plot.pdf",
     q_values_plot = "results/limma_placentas/q_value_distribution.pdf",
     q_values_plot_zoomed = "results/limma_placentas/q_value_distribution_zoomed.pdf",
-    volcano_plots = "results/limma_placentas/volcano_plots.pdf",
+    volcano_plots = "results/limma_placentas/volcano_plots.png",
     summary_csv = "results/limma_placentas/fold_change_summary.csv",
     summary_rds = "results/limma_placentas/fold_change_summary.rds",
     ranked_genes_upregulated = "results/limma_placentas/ranked_list_upregulated_genes.rds",
