@@ -12,11 +12,9 @@ rule all:
   input: 
     multiqc_report = "reports/multiqc/multiqc.html",
     linear_model_placentas = "results/limma_placentas/fitted_model.Rdata",
-    gsea_enrichment = 
-      expand("results/gost_enrichment_run_{tissue}/gost_results_{up_or_down}.rds", 
-        tissue = MODELS, 
-        up_or_down = ("upregulated", "downregulated")
-      )
+    go_results = expand("results/gost_enrichment_format/enrichment_{models}_{up_or_down}_long.csv",
+      models = MODELS, up_or_down = ("upregulated", "downregulated")
+    )
 
 rule md5:
   input:
@@ -232,7 +230,9 @@ rule enrichment_run:
 
 # Format enrichment result to human readable tidy table
 rule enrichment_format:
-  input: "results/gost_enrichment_run/{enrichment_results}.Rdata"
-  output: "results/gost_enrichment_format/{enrichment_results}.csv"
+  input: "results/gost_enrichment_run_{model}/gost_results_{up_or_down}.rds"
+  output: 
+    go_long_format = "results/gost_enrichment_format/enrichment_{model}_{up_or_down}_long.csv",
+    go_wide_format = "results/gost_enrichment_format/enrichment_{model}_{up_or_down}_wide.csv"
   script: 
     "scripts/gost_enrichment_format.R"

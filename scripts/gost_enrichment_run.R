@@ -20,7 +20,7 @@ gost_result_list <-
       custom_bg = .x,
       correction_method = "gSCS",
       user_threshold = snakemake@params[["max_fdr"]],
-      significant = TRUE,
+      significant = FALSE,
       measure_underrepresentation = FALSE
     )
   )
