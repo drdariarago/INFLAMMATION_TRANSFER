@@ -184,7 +184,8 @@ rule limma:
 # Fit linear models for the 2 placentas
 rule limma_placentas:
   input:
-    "results/tximeta/expression_results.Rdata"
+    expression_results = "results/tximeta/expression_results.Rdata",
+    gene_data = "results/download_gene_data/gene_names.Rdata"
   output:
     factor_design_matrix = "results/limma_placentas/factor_design_matrix.csv",
     linear_models = "results/limma_placentas/fitted_model.Rdata",
