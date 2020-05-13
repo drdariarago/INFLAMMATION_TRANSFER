@@ -178,7 +178,8 @@ ggplot(result_summary_table,
   scale_x_continuous(breaks = seq(-5,5,2), minor_breaks = seq(-4,4,2)) +
   coord_cartesian(xlim = c(-5,5), ylim = c(1E-13,1)) +
   scale_color_brewer(type = 'qual', direction = -1) +
-  geom_hline(aes(yintercept = snakemake@params[['alpha']])) +
+  geom_hline(aes(yintercept = snakemake@params[['alpha']])) + 
+  labs(col = 'Absolute Log Fold Change over 0.5') + 
   ggtitle(label = 'q-value vs fold change across different contrasts')
 
 ggsave(filename = snakemake@output[['volcano_plots']], width = 11.7, height = 8.3, units = "in")
