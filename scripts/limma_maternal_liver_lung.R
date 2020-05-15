@@ -26,7 +26,7 @@ experiment_data <-
 tissue_data <- 
   experiment_data$samples %$%
   paste(maternal_fetal, tissue, sep = "_") %>% 
-  magrittr::equals("maternal_liver") %>% # change to wildcard
+  magrittr::equals(snakemake@params[['tissue']]) %>% 
   experiment_data[,.]
 
 tissue_data$samples <-
