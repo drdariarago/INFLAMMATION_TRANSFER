@@ -1,6 +1,6 @@
 fastq_files, = glob_wildcards('data/02_seqdata/{filename}.fq.gz')
 TISSUE_TYPES = ("placenta_maternal", "lung_maternal", "liver_maternal", "liver_fetal", "placenta_fetal")
-MODELS = ("placentas", "fetal_liver")
+MODELS = ("placentas", "fetal_liver", "maternal_liver", "maternal_lung")
 
 MIN_COUNTS = 5
 ALPHA = 0.05
@@ -217,7 +217,7 @@ rule limma_fetal_liver:
     linear_models = "results/limma_fetal_liver/fitted_model.Rdata",
     fdr_plot = "results/limma_fetal_liver/fdr_plot.pdf",
     q_values_plot = "results/limma_fetal_liver/q_value_distribution.pdf",
-    q_values_plot_zoomed = "results/limma_placentas/q_value_distribution_zoomed.pdf",
+    q_values_plot_zoomed = "results/limma_fetal_liver/q_value_distribution_zoomed.pdf",
     volcano_plots = "results/limma_fetal_liver/volcano_plots.png",
     summary_csv = "results/limma_fetal_liver/fold_change_summary.csv",
     summary_rds = "results/limma_fetal_liver/fold_change_summary.rds",
@@ -229,6 +229,32 @@ rule limma_fetal_liver:
     alpha = ALPHA
   script:
     "scripts/limma_fetal_liver.R"
+    
+# Fit linear models for maternal liver and maternal lung
+rule limma_maternal_liver_lung:
+  input:
+    expression_results = "results/tximeta/expression_results.Rdata",
+    gene_data = "results/download_gene_data/gene_names.Rdata"
+  output:
+    factor_design_matrix = "results/limma_{tissue}/factor_design_matrix.csv",
+    linear_models = "results/limma_{tissue}/fitted_model.Rdata",
+    fdr_plot = "results/limma_{tissue}/fdr_plot.pdf",
+    q_values_plot = "results/limma_{tissue}/q_value_distribution.pdf",
+    q_values_plot_zoomed = "results/limma_{tissue}/q_value_distribution_zoomed.pdf",
+    volcano_plots = "results/limma_{tissue}/volcano_plots.png",
+    summary_csv = "results/limma_{tissue}/fold_change_summary.csv",
+    summary_rds = "results/limma_{tissue}/fold_change_summary.rds",
+    ranked_genes_upregulated = "results/limma_{tissue}/ranked_list_upregulated_genes.rds",
+    ranked_genes_downregulated = "results/limma_{tissue}/ranked_list_downregulated_genes.rds"
+  params:
+    min_counts = MIN_COUNTS,
+    fold_change_threshold = MIN_LOGFC,
+    alpha = ALPHA,
+    tissue = "{tissue}"
+  wildcard_constraints:
+    tissue = "maternal.*"
+  script:
+    "scripts/limma_maternal_liver_lung.R"
     
 # Create variance stabilized counts for exploratory plotting
 rule vsd:

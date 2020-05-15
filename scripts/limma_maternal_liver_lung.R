@@ -1,4 +1,4 @@
-## Compare expression between exposed and control fetal liver
+## Compare expression between exposed and control maternal liver and maternal lung
 
 library(limma)
 library(edgeR)
@@ -22,33 +22,37 @@ experiment_data <-
   .[,.$samples$exposure != "TiO2"] %>% 
   calcNormFactors(method = "TMM")
 
-# Subset only the fetal liver
-liver_data <- 
-  experiment_data[, experiment_data$samples$tissue == "liver" & experiment_data$samples$maternal_fetal == "fetal"]
+# Subset only the maternal liver or lung via wildcard
+tissue_data <- 
+  experiment_data$samples %$%
+  paste(maternal_fetal, tissue, sep = "_") %>% 
+  magrittr::equals("maternal_liver") %>% # change to wildcard
+  experiment_data[,.]
 
-liver_data$samples <-
-  liver_data$samples %>% 
+tissue_data$samples <-
+  tissue_data$samples %>% 
   mutate(
     exposure = exposure %>% droplevels() %>% factor(x = ., levels = c('LPS', 'ctr')),
-    timepoint = factor(x = liver_data$samples$timepoint, levels = c(2,5,12,24))
+    timepoint = factor(x = tissue_data$samples$timepoint, levels = c(2,5,12,24))
   )
 
 # Design matrix
-# Set intercept on controls, calculate coefs for each treatment separately at each stage
+# Calculate overall trajectory of gene expression over time with 3rd order polynomial
+# Check if any of the components (baseline, linear, quadratic or cubic) change with exposure
 
 design <- 
   model.matrix(
-    object = formula( ~ 0 + timepoint / exposure),
+    object = formula( ~ timepoint * exposure),
     contrasts.arg = list( 
-      timepoint = "contr.sum",
+      timepoint = "contr.poly",
       exposure = "contr.sum"
     ),
-    data = liver_data$samples
+    data = tissue_data$samples
   )
 
 design_check <-
   design %>% 
-  set_rownames(liver_data$samples[ ,1])
+  set_rownames(tissue_data$samples[ ,1])
 
 print(x = "Performing the following contrasts:")
 colnames(design_check)
@@ -59,12 +63,13 @@ write_csv(x = as.data.frame(design_check), path = snakemake@output[['factor_desi
 
 filtered_data <-
   filterByExpr(
-    y = liver_data, 
+    y = tissue_data, 
     design = design, 
-    min.count = snakemake@params[['min_counts']],
+    # min.count = snakemake@params[['min_counts']],
+    min.count = 5,
     min.total.count = 1
   ) %>% 
-  liver_data[., , keep.lib.sizes = T] %>% 
+  tissue_data[., , keep.lib.sizes = T] %>% 
   voom(
     counts = .,
     design = design,
@@ -95,10 +100,19 @@ q_values <-
     contrast = factor(
       x = contrast, 
       levels = c(
-        paste("timepoint", c(2,5,12,24), sep = ""),
-        paste("timepoint", c(2,5,12,24), ":exposure1", sep = "")
-      )),
-    exposure = factor(x = grepl(pattern = "exposure", x = contrast), labels = c('other', 'exposure'))
+        "(Intercept)",
+        paste("timepoint", c("L","Q","C"), sep = "."),
+        "exposure1",
+        paste("timepoint", c("L","Q","C"), sep = ".") %>% paste(., "exposure1", sep = ":")
+      ) 
+    ) %>% 
+      fct_recode("timepoint.I" = "(Intercept)", "timepoint.I:exposure1" = "exposure1"),
+    component = factor(
+      x = str_extract(string = contrast, 
+                      pattern = 'timepoint\\.[I,L,Q,C]'), 
+      levels = paste('timepoint', c("I","L","Q","C"), sep = "."),
+      labels = c("intercept", "linear", "quadratic", "cubic")),
+    exposure = factor(x = grepl(pattern = 'exposure', x = contrast), levels = c(F,T), labels = c('baseline', 'response'))
   )
 
 dev.off()
@@ -107,9 +121,9 @@ dev.off()
 
 q_distribution <-
   q_values %>% 
-  ggplot(data = ., mapping = aes(x = q_value, fill = contrast)) +
+  ggplot(data = ., mapping = aes(x = q_value)) +
   geom_histogram(position = 'dodge', binwidth = 0.08) +
-  facet_wrap( ~ exposure) +
+  facet_grid(exposure ~ component) +
   scale_fill_manual(values = viridis::viridis(16)) +
   ggtitle(label = 'q-value distribution of different fetal liver contrasts')
 
@@ -121,7 +135,7 @@ ggsave(filename = snakemake@output[['q_values_plot']],
 # Zoom to focus on interaction terms
 
 q_distribution +
-  coord_cartesian(ylim = c(0,6000)) 
+  coord_cartesian(ylim = c(0,7000)) 
 
 ggsave(filename = snakemake@output[['q_values_plot_zoomed']], 
        width = 297, height = 210, units = 'mm')
@@ -136,11 +150,18 @@ fold_change <-
     contrast = factor(
       x = contrast, 
       levels = c(
-        paste("timepoint", c(2,5,12,24), sep = ""),
-        paste("timepoint", c(2,5,12,24), ":exposure1", sep = "")
-      )
-    ),
-    timepoint = factor(x = str_extract(string = contrast, pattern = 'timepoint[0-9]{1,2}'), levels = paste('timepoint', c(2,5,12,24), sep = "")),
+        "(Intercept)",
+        paste("timepoint", c("L","Q","C"), sep = "."),
+        "exposure1",
+        paste("timepoint", c("L","Q","C"), sep = ".") %>% paste(., "exposure1", sep = ":")
+      ) 
+    ) %>% 
+      fct_recode("timepoint.I" = "(Intercept)", "timepoint.I:exposure1" = "exposure1"),
+    component = factor(
+      x = str_extract(string = contrast, 
+                      pattern = 'timepoint\\.[I,L,Q,C]'), 
+      levels = paste('timepoint', c("I","L","Q","C"), sep = "."),
+      labels = c("intercept", "linear", "quadratic", "cubic")),
     exposure = factor(x = grepl(pattern = 'exposure', x = contrast), levels = c(F,T), labels = c('baseline', 'response'))
   )
 
@@ -167,18 +188,16 @@ result_summary_table <-
 ggplot(result_summary_table, 
        aes(x = logFC, y = q_value, col = abs(logFC) > snakemake@params[['fold_change_threshold']])
 ) +
-  facet_grid(timepoint ~ exposure) +
+  facet_grid(component ~ exposure) +
   geom_point(alpha = 0.3) + 
   scale_y_continuous(trans = 'log10', oob = scales::squish) +
-  scale_x_continuous(breaks = seq(-5,5,2), minor_breaks = seq(-4,4,2)) +
-  coord_cartesian(xlim = c(-5,5), ylim = c(1E-13,1)) +
+  coord_cartesian(xlim = c(-5,5), ylim = c(1E-24,1)) +
   scale_color_brewer(type = 'qual', direction = -1) +
   geom_hline(aes(yintercept = snakemake@params[['alpha']])) +
   labs(col = 'Absolute LogFC over 0.5') + 
   ggtitle(label = 'q-value vs fold change across different contrasts')
 
 ggsave(filename = snakemake@output[['volcano_plots']], width = 11.7, height = 8.3, units = "in", device = 'png', dpi = 'retina')
-
 
 # Save gene-wise summaries 
 
