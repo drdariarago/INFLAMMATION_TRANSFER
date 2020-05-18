@@ -1,4 +1,4 @@
-## Compare expression between exposed and control fetal liver
+## Compare expression between control and treatment across all non-placenta tissues
 
 library(limma)
 library(edgeR)
@@ -22,15 +22,19 @@ experiment_data <-
   .[,.$samples$exposure != "TiO2"] %>% 
   calcNormFactors(method = "TMM")
 
-# Subset only the fetal liver
-liver_data <- 
-  experiment_data[, experiment_data$samples$tissue == "liver" & experiment_data$samples$maternal_fetal == "fetal"]
+# Subset only the tissue of interest
+tissue_data <- 
+  tissue_data <- 
+  experiment_data$samples %$%
+  paste(maternal_fetal, tissue, sep = "_") %>% 
+  magrittr::equals(snakemake@params[['tissue']]) %>% 
+  experiment_data[,.]
 
-liver_data$samples <-
-  liver_data$samples %>% 
+tissue_data$samples <-
+  tissue_data$samples %>% 
   mutate(
     exposure = exposure %>% droplevels() %>% factor(x = ., levels = c('LPS', 'ctr')),
-    timepoint = factor(x = liver_data$samples$timepoint, levels = c(2,5,12,24))
+    timepoint = factor(x = tissue_data$samples$timepoint, levels = c(2,5,12,24))
   )
 
 # Design matrix
@@ -43,12 +47,12 @@ design <-
       timepoint = "contr.sum",
       exposure = "contr.sum"
     ),
-    data = liver_data$samples
+    data = tissue_data$samples
   )
 
 design_check <-
   design %>% 
-  set_rownames(liver_data$samples[ ,1])
+  set_rownames(tissue_data$samples[ ,1])
 
 print(x = "Performing the following contrasts:")
 colnames(design_check)
@@ -59,12 +63,12 @@ write_csv(x = as.data.frame(design_check), path = snakemake@output[['factor_desi
 
 filtered_data <-
   filterByExpr(
-    y = liver_data, 
+    y = tissue_data, 
     design = design, 
     min.count = snakemake@params[['min_counts']],
     min.total.count = 1
   ) %>% 
-  liver_data[., , keep.lib.sizes = T] %>% 
+  tissue_data[., , keep.lib.sizes = T] %>% 
   voom(
     counts = .,
     design = design,
@@ -111,7 +115,7 @@ q_distribution <-
   geom_histogram(position = 'dodge', binwidth = 0.08) +
   facet_wrap( ~ exposure) +
   scale_fill_manual(values = viridis::viridis(16)) +
-  ggtitle(label = 'q-value distribution of different fetal liver contrasts')
+  ggtitle(label = paste0('q-value distribution of ', snakemake@params[["tissue"]], ' contrasts'))
 
 q_distribution
 
@@ -175,7 +179,7 @@ ggplot(result_summary_table,
   scale_color_brewer(type = 'qual', direction = -1) +
   geom_hline(aes(yintercept = snakemake@params[['alpha']])) +
   labs(col = 'Absolute LogFC over 0.5') + 
-  ggtitle(label = 'q-value vs fold change across different contrasts')
+  ggtitle(label = paste0('Fold-change vs q-values of ', snakemake@params[["tissue"]], ' contrasts'))
 
 ggsave(filename = snakemake@output[['volcano_plots']], width = 11.7, height = 8.3, units = "in", device = 'png', dpi = 'retina')
 
