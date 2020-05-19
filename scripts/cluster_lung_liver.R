@@ -2,7 +2,7 @@
 
 library(tidyverse)
 library(magrittr)
-library(pracma)
+library(cluster)
 
 ## Import log FC data
 model_results <- 
@@ -17,45 +17,66 @@ model_results <-
 normalized_fold_change_matrix <-
   model_results %>% 
   group_by(ensembl_gene_id) %>% 
-  filter(all(q_value < 0.05)) %>% 
+  filter(any(q_value < 0.05 & logFC > 0.5)) %>% 
+  mutate(
+    logFC = ifelse(q_value < 0.01, logFC, 0.001)
+  ) %>%
   pivot_wider(id_cols = timepoint, names_from = ensembl_gene_id, values_from = logFC)  %>% 
   column_to_rownames(var = "timepoint") %>% 
   as.matrix() %>% 
+  exp() %>% 
   scale(x = ., center = TRUE, scale = FALSE) %>% 
   add(10) %>% 
-  t()
+  t() %>% 
+  as_tibble(x = ., rownames = 'ensembl_gene_id')
+
 
 normalized_fold_change_matrix %>% 
-  as_tibble(x = ., rownames = 'ensembl_gene_id') %>% 
-  pivot_longer(data = ., cols = -ensembl_gene_id, names_to = "timepoint", values_to = 'logFC') %>% 
-  ggplot(data = ., mapping = aes(x = timepoint, y = logFC, group = ensembl_gene_id)) +
-  geom_line(alpha = 0.1) 
+  pivot_longer(data = ., cols = -ensembl_gene_id, names_to = "timepoint", values_to = 'normalized_fc') %>% 
+  ggplot(data = ., mapping = aes(x = timepoint, y = normalized_fc, group = ensembl_gene_id)) +
+  geom_line(alpha = 0.05) 
 
 ## Functionalize following section, just use a vector 1:4 for each base calculation
-# Calculate base1 
-time1 <- outer(normalized_fold_change_matrix[,1], normalized_fold_change_matrix[,1], FUN = '-') 
-# Calculate base2 
-time2 <- outer(normalized_fold_change_matrix[,2], normalized_fold_change_matrix[,2], FUN = '-') 
-# Calculate base3 
-time3 <- outer(normalized_fold_change_matrix[,3], normalized_fold_change_matrix[,3], FUN = '-') 
-# Calculate base 4
-time4 <- outer(normalized_fold_change_matrix[,4], normalized_fold_change_matrix[,4], FUN = '-') 
+normalized_distance_matrices <-
+  normalized_fold_change_matrix %>%  
+  map(
+    .x = ., 
+    .f = ~ .x
+  ) %>% 
+  magrittr::extract(
+    grepl(pattern = "timepoint[0-9]{1,2}", x = names(.))
+  ) %>%
+  map(
+    .x = .,
+    .f = ~ outer(X = .x, Y = .x, FUN = `-`) 
+  ) %>% 
+  map(
+    .f = ~ matrix(data = .x, nrow = nrow(normalized_fold_change_matrix),
+                  dimnames = list(
+                    normalized_fold_change_matrix$ensembl_gene_id,
+                    normalized_fold_change_matrix$ensembl_gene_id)
+    )
+  ) 
 
 # trapezoid area formula for each time step, proportional to difference in hours
 # caveat: if the 2 sides have different sign we had an inversion: divide the area by another 2 to get the area of 2 triangles instead
-delta_hours = c(3,7,12)
+delta_hours = c(1,1,1) #c(3,7,12)
+timepoints = names(normalized_distance_matrices)
 
 areas <-
-  list(
-    area1 = time1 + time2,
-    area2 = time2 + time3,
-    area3 = time3 + time4
+  normalized_distance_matrices %>% 
+  map2(
+    .x = .[1:3],
+    .y = .[-1],
+    .f = ~ .x + .y
   ) %>% 
-  map(.x = ., ~ .x/2) %>% 
+  set_names(
+    x = ., nm = c("interval1", "interval2", "interval3")
+  ) %>% 
   map2(
     .x = ., 
     .y = delta_hours,
-    .f = ~ .x * .y
+    .f = ~ (.x/2) * .y
   ) %>% 
   map(
     .x = .,
@@ -74,12 +95,12 @@ plot(tree)
 
 hclust_clusters <- 
   tree %>%
-  cutree(h = 2.5) 
+  cutree(k = 20) 
 
 # Use PAM
 pam_clusters <-
   delta_areas %>% 
-  pam(x = ., diss = TRUE, k = 9, cluster.only = TRUE)
+  pam(x = ., diss = TRUE, k = 8, cluster.only = TRUE)
 
 
 # Merge clusters with previous data and plot mean vs spread of expression for each
@@ -98,3 +119,4 @@ pam_clusters %>%
             aes(group = value), col = 'hotpink'
   ) + 
   coord_cartesian(ylim = c(-1,2))
+
