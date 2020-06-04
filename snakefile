@@ -15,7 +15,8 @@ rule all:
     linear_model_summary = expand("results/limma_{models}/fold_change_summary.csv", models = MODELS),
     go_results = expand("results/gost_enrichment_format/enrichment_{models}_{up_or_down}_long.csv",
       models = MODELS, up_or_down = ("upregulated", "downregulated")
-    )
+    ),
+    fold_change_matrices = "results/fold_enrichment_format/response_matrix_list.rds"
 
 rule md5:
   input:
@@ -263,3 +264,15 @@ rule enrichment_format:
     go_wide_format = "results/gost_enrichment_format/enrichment_{model}_{up_or_down}_wide.csv"
   script: 
     "scripts/gost_enrichment_format.R"
+
+# Format log fold change data for heatmaps
+rule fold_change_format:
+  input:
+    fold_change_summaries = expand(
+      "results/limma_{tissue}/fold_change_summary.rds", 
+      tissue = ("maternal_lung", "maternal_liver", "placentas", "fetal_liver")
+      )
+  output:
+    "results/fold_enrichment_format/response_matrix_list.rds"
+  script:
+    "scripts/fold_enrichment_format.R"
