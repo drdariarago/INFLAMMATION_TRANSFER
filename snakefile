@@ -273,6 +273,8 @@ rule fold_change_format:
       tissue = ("maternal_lung", "maternal_liver", "placentas", "fetal_liver")
       )
   output:
-    "results/fold_enrichment_format/response_matrix_list.rds"
+    matrix_list = "results/fold_enrichment_format/response_matrix_list.rds",
+    lps_response = "results/fold_enrichment_format/lps_response_summary.csv",
+    maternal_lps_response = "results/fold_enrichment_format/maternal_lps_response_summary.csv"
   script:
     "scripts/fold_enrichment_format.R"

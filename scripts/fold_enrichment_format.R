@@ -1,5 +1,8 @@
 ## Format fold change tables to generate global report
 
+#### Load libraries and data ####
+
+# Load libraries
 library(tidyverse)
 library(magrittr)
 
@@ -59,4 +62,33 @@ response_matrix_list[["fetal_placenta"]] <-
   shared_response_placenta - differences_response_placenta
 
 # Save as rds
-write_rds(response_matrix_list, snakemake@output[[1]])
+write_rds(response_matrix_list, snakemake@output[["matrix_list"]])
+
+#### Create gene by annotation summary tables ####
+
+# Filter and compile LPS response without maternal:exposure contrasts
+fold_change_list %>% 
+  modify_at(
+    .at = c("placentas"),
+    .f = 
+      ~ .x %>% 
+      dplyr::filter(maternal == "shared") %>% 
+      dplyr::select(- maternal)
+  ) %>% 
+  map_dfr(.f = 
+           ~ .x %>% 
+           dplyr::select(- contrast, - exposure) %>% 
+           filter(q_value < 0.05) %>% 
+           filter(abs(logFC) > 0.5), 
+         .id = "tissue") %>% 
+  write_csv(path = snakemake@output[["lps_response"]])
+
+# Filter only maternal:exposure contrasts
+
+fold_change_list[["placentas"]] %>% 
+  filter(maternal == "difference") %>%
+  dplyr::select(- maternal) %>% 
+  dplyr::select(- contrast, - exposure) %>% 
+  filter(q_value < 0.05) %>% 
+  filter(abs(logFC) > 0.5) %>% 
+  write_csv(path = snakemake@output[["maternal_lps_response"]])
