@@ -11,8 +11,6 @@ import re
 rule all:
   input: 
     multiqc_report = "reports/multiqc/multiqc.html",
-    linear_model = expand("results/limma_{models}/fitted_model.Rdata", models = MODELS),
-    linear_model_summary = expand("results/limma_{models}/fold_change_summary.csv", models = MODELS),
     go_results = expand("results/gost_enrichment_format/enrichment_{models}_{up_or_down}_long.csv",
       models = MODELS, up_or_down = ("upregulated", "downregulated")
     ),
