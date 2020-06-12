@@ -172,17 +172,6 @@ rule download_gene_data:
   script:
     "scripts/download_gene_data.R"
 
-# Fit simple linear models via limma
-rule limma:
-  input:
-    "results/tximeta/expression_results.Rdata"
-  output:
-    plots = "results/limma/voom_plots.pdf",
-    fitted_models = "results/limma/fitted_models.Rdata",
-    limma_coefs = "results/limma/limma_coefs.Rdata"
-  script:
-    "scripts/limma.R"
-
 # Fit linear models for the 2 placentas
 rule limma_placentas:
   input:
