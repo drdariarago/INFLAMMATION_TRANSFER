@@ -14,7 +14,8 @@ rule all:
     go_results = expand("results/gost_enrichment_format/enrichment_{models}_{up_or_down}_long.csv",
       models = MODELS, up_or_down = ("upregulated", "downregulated")
     ),
-    fold_change_matrices = "results/fold_enrichment_format/response_matrix_list.rds"
+    fold_change_matrices = "results/fold_enrichment_format/response_matrix_list.rds",
+    receptor_ligand_map =  "results/match_orthologs/human_mouse_ligands_receptors.txt"
 
 rule md5:
   input:
@@ -265,3 +266,34 @@ rule fold_change_format:
     maternal_lps_response = "results/fold_enrichment_format/maternal_lps_response_summary.csv"
   script:
     "scripts/fold_enrichment_format.R"
+
+# List all genes involved in each protein complex for receptor/ligand pairs
+rule untangle_pairs:
+  input:
+    "data/cellphone_db/protein_curated.csv",  
+    "data/cellphone_db/complex_curated.csv", 
+    "data/cellphone_db/interaction_curated.csv",
+    "data/cellphone_db/gene_input.csv"
+  output:
+    "results/untangle_pairs/human_secreted_to_receptor.txt"
+  shell:
+    "scripts/untangle_pairs.pl {input} {output}"
+
+# Create lookup table for human to mouse genes via bioMart
+rule ortholog_conversion:
+  input: 
+    "results/untangle_pairs/human_secreted_to_receptor.txt"
+  output:
+    "results/ortholog_conversion/human_mouse_orthologs.txt"
+  script:
+    "scripts/ortholog_conversion.R"
+  
+# Remove multi-hit and no-hit human to mouse orthologs
+rule match_orthologs:
+  input:
+    "results/ortholog_conversion/human_mouse_orthologs.txt",
+    "results/untangle_pairs/human_secreted_to_receptor.txt"
+  output:
+    "results/match_orthologs/human_mouse_ligands_receptors.txt"
+  shell:
+    "scripts/match_orthologs.pl {input} {output}"
