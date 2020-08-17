@@ -174,6 +174,12 @@ rule download_gene_data:
     "scripts/download_gene_data.R"
 
 # Fit linear models for the 2 placentas
+# NOTE
+# 3 way interaction: the residual response of maternal placenta. 
+# Positive for exposed maternal placentas, negative for maternal controls
+# Negative for exposed foetal placenta, positive for foetal controls
+# High values mean greater response in maternal than in fetal placenta and vice versa
+
 rule limma_placentas:
   input:
     expression_results = "results/tximeta/expression_results.Rdata",
