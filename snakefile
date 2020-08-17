@@ -14,7 +14,7 @@ rule all:
     go_results = expand("results/gost_enrichment_format/enrichment_{models}_{up_or_down}_long.csv",
       models = MODELS, up_or_down = ("upregulated", "downregulated")
     ),
-    fold_change_matrices = "results/fold_enrichment_format/response_matrix_list.rds",
+    fold_change_matrices = "results/heatmap_fold_change_format/response_matrix_list.rds",
     receptor_ligand_map =  "results/match_orthologs/human_mouse_ligands_receptors.txt"
 
 rule md5:
@@ -260,18 +260,18 @@ rule enrichment_format:
     "scripts/gost_enrichment_format.R"
 
 # Format log fold change data for heatmaps
-rule fold_change_format:
+rule heatmap_fold_change_format:
   input:
     fold_change_summaries = expand(
       "results/limma_{tissue}/fold_change_summary.rds", 
       tissue = ("maternal_lung", "maternal_liver", "placentas", "fetal_liver")
       )
   output:
-    matrix_list = "results/fold_enrichment_format/response_matrix_list.rds",
-    lps_response = "results/fold_enrichment_format/lps_response_summary.csv",
-    maternal_lps_response = "results/fold_enrichment_format/maternal_lps_response_summary.csv"
+    matrix_list = "results/heatmap_fold_change_format/response_matrix_list.rds",
+    lps_response = "results/heatmap_fold_change_format/lps_response_summary.csv",
+    maternal_lps_response = "results/heatmap_fold_change_format/maternal_lps_response_summary.csv"
   script:
-    "scripts/fold_enrichment_format.R"
+    "scripts/heatmap_fold_change_format.R"
 
 # List all genes involved in each protein complex for receptor/ligand pairs
 rule untangle_pairs:
