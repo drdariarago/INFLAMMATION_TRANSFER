@@ -34,11 +34,15 @@ close IN;
 
 #print "test $ens_orthologs{ENSG00000206384}  $symbol_orthologs{COL6A6} \n";# works
 
-print OUT join ( "\t", (  'secreted_ensembl_gene_mouse' , 'secreted_gene_symbol_mouse',
-		'secreted_ensembl_gene_human, $secreted_genesymbol_human' , 	
-		 	'interacting_receptor_genesymbol_human',	
-		'interacting_receptor_ensembl_gene_human', 
-'interacting_receptor_genesymbol_mouse', 'interacting_receptor_ensembl_gene_mouse'
+print OUT join ( "\t", (
+  'secreted_ensembl_gene_mouse' , 
+  'secreted_gene_symbol_mouse', 
+  'secreted_ensembl_gene_human', 
+  'secreted_genesymbol_human', 
+  'interacting_receptor_genesymbol_human',	
+  'interacting_receptor_ensembl_gene_human', 
+  'interacting_receptor_genesymbol_mouse', 
+  'interacting_receptor_ensembl_gene_mouse'
 
 		)), "\n";
 
@@ -89,12 +93,16 @@ my ($secreted_ensembl_gene_mouse, $secreted_gene_symbol_mouse, $interacting_rece
 
 
 	# printout
-	print OUT join ( "\t", (  $secreted_ensembl_gene_mouse , $secreted_gene_symbol_mouse,
-		$secreted_ensembl_gene_human, $secreted_genesymbol_human,  	
-		 	$interacting_receptor_genesymbol_human,	
+	print OUT join ( "\t", (  
+	  $secreted_ensembl_gene_mouse, 
+	  $secreted_gene_symbol_mouse, 
+	  $secreted_ensembl_gene_human, 
+	  $secreted_genesymbol_human, 
+	  $interacting_receptor_genesymbol_human,	
 		$interacting_receptor_ensembl_gene_human, 
-$interacting_receptor_genesymbol_mouse, $interacting_receptor_ensembl_gene_mouse
-
+		$interacting_receptor_genesymbol_mouse, 
+		$interacting_receptor_ensembl_gene_mouse
+		
 		)), "\n";
 
 
