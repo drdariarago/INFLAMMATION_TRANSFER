@@ -11,7 +11,8 @@ import re
 rule all:
   input: 
     multiqc_report = "reports/multiqc/multiqc.html",
-    go_results = expand("results/gost_enrichment_format/enrichment_{models}_{up_or_down}_long.csv",
+    go_results = expand(
+      "results/gost_enrichment_format/enrichment_{models}_{up_or_down}_long.csv",
       models = MODELS, up_or_down = ("upregulated", "downregulated")
     ),
     fold_change_matrices = "results/heatmap_fold_change_format/response_matrix_list.rds",
@@ -227,6 +228,18 @@ rule limma_non_placentas:
     tissue = ".*_.*"
   script:
     "scripts/limma_non_placentas.R"
+
+# Create upset plots of differentially expressed genes from linear model results
+rule upset:
+  input:
+    "results/limma_{tissue}/fold_change_summary.rds"
+  output:
+    "results/upsetr/{tissue}.pdf"
+  params:
+    ALPHA = ALPHA,
+    MIN_LOGFC = MIN_LOGFC
+  script:
+    "scripts/upsetr.R"
     
 # Create variance stabilized counts for exploratory plotting
 rule vsd:
