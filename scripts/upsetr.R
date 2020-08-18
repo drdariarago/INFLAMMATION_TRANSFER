@@ -3,23 +3,44 @@
 library(UpSetR)
 library(tidyverse)
 library(magrittr)
+library(janitor)
+
+ALPHA = 0.05
+MIN_LOGFC = 0.5
+tissue <- c("fetal_liver", "maternal_liver")
 
 annotated_results <- 
-  readRDS(here::here("results/limma_results/annotated_results.Rdata")) %>% 
-  map(.x = ., 
-      .f = ~ dplyr::select(.data = .x, -7)
-  )  
+  glue::glue("results/limma_{tissue}/fold_change_summary.rds") %>% 
+  here::here() %>% 
+  map( readRDS ) %>% 
+  set_names( tissue ) %>% 
+  map(
+    .f = filter,
+    q_value < ALPHA, 
+    abs(logFC) > MIN_LOGFC,
+    exposure == "response",
+    mgi_symbol != ""
+  ) %>% 
+  map(
+    .f = select,
+    mgi_symbol, timepoint
+  ) %>%
+  map(
+    .f = ~ janitor::tabyl( .x, mgi_symbol, timepoint)
+  ) %>% 
+  map( as.data.frame)
 
 
-set_plots <- imap(
-  .x = annotated_results,
-  .f = UpSetR::upset, 
-  nintersects = NA,
-  sets = c("timepoint24", "timepoint12", "timepoint5", "timepoint2"),
-  keep.order = T,
-  order.by = "freq",
-  empty.intersections = T,
-  mainbar.y.max = 1500
+set_plots <- 
+  imap(
+    .x = annotated_results,
+    .f = upset,
+    nintersects = NA,
+    sets = c("timepoint24", "timepoint12", "timepoint5", "timepoint2"),
+    keep.order = T,
+    order.by = "freq",
+    empty.intersections = T,
+    mainbar.y.max = 1500
 )
 
 pdf(file = here::here("results/upsetr/maternal_lung.pdf"), width = 6.67, height = 7.5)
