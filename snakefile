@@ -11,12 +11,16 @@ import re
 rule all:
   input: 
     multiqc_report = "reports/multiqc/multiqc.html",
+    limma_results =  "results/limma_compile_results/limma_results_no_maternal_contrasts.csv",
     go_results = expand(
       "results/gost_enrichment_format/enrichment_{models}_{up_or_down}_long.csv",
       models = MODELS, up_or_down = ("upregulated", "downregulated")
     ),
     fold_change_matrices = "results/heatmap_fold_change_format/response_matrix_list.rds",
-    receptor_ligand_map =  "results/match_orthologs/human_mouse_ligands_receptors.txt"
+    receptor_ligand_map =  "results/match_orthologs/human_mouse_ligands_receptors.txt",
+    upsetr_plots = expand(
+      "results/upsetr/{tissue}.pdf",
+      tissue = MODELS)
 
 rule md5:
   input:
@@ -228,6 +232,21 @@ rule limma_non_placentas:
     tissue = ".*_.*"
   script:
     "scripts/limma_non_placentas.R"
+
+# Merge all limma summaries in a single table
+rule limma_compile_results:
+  input:
+    limma_results = expand(
+      "results/limma_{models}/fold_change_summary.rds",
+      models = MODELS
+    )
+  output:
+    maternal = "results/limma_compile_results/limma_results_maternal_contrasts.csv",
+    summary =  "results/limma_compile_results/limma_results_no_maternal_contrasts.csv"
+  params:
+    models = MODELS
+  script:
+    "scripts/limma_compile_results.R"
 
 # Create upset plots of differentially expressed genes from linear model results
 rule upset:
