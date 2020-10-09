@@ -6,6 +6,19 @@ library(tidyverse)
 library(magrittr)
 library(ggplot2)
 library(patchwork)
+library(ggrepel)
+
+a4 = c(297, 210)
+
+# Check for presence of cytokines
+
+cytokines <-
+  read_tsv(file = "results/match_orthologs/human_mouse_ligands_receptors.txt") %>% 
+  filter(
+    grepl(pattern = "^(I|Cxc)l.*", secreted_gene_symbol_mouse)
+  ) %>% 
+  dplyr::pull(secreted_ensembl_gene_mouse) %>% 
+  unique()
 
 receptor_ligand_pairs <-
   read_tsv(file = "results/match_orthologs/human_mouse_ligands_receptors.txt") %>% 
@@ -30,7 +43,7 @@ fold_change_summary <-
 
 messenger_tissues <- c("maternal_lung", "maternal_liver")
 target_tissues <- c("placentas", "fetal_liver")
-timepoints <- paste("timepoint", c(2,5), sep = "")
+timepoints <- paste("timepoint", c(2,5,12,24), sep = "")
 log_fc_threshold <- 0.5
 q_value_threshold <-0.05
 
@@ -121,44 +134,149 @@ named_receptor_ligand_pairs <-
     x = gene_names,
     y = annotated_receptor_ligand_pairs_orphaned,
     by = "ensembl_gene_id"
-  )
+  ) %>% 
+  as_tibble()
 
-
-# Graph interactions
-# Create 4 plots: lung to placenta, lung to liver, liver to placenta, liver to liver
-# use purrr map wiht 2 lists (messengers, targets) to subset and iterate ggplot
-
-interaction_plots <-
-  crossing(
-  messenger_tissues, target_tissues
-) %>% 
-  t() %>% 
-  as.data.frame() %>% 
-  as.list() %>% 
-  map(.x = ., .f = ~ as.vector(.x)) %>% 
-  map(
-  .x = .,
-  .f = ~ filter( named_receptor_ligand_pairs, tissue %in% .x, paired == "paired")
-) %>% 
-  map(
-    .x = .,
-    .f = ~ ggplot(
-      data = .x,
-      aes(
-        x = gene_class, y = log_fc_response, col = tissue, alpha = - log10(q_value_response)
-      )
-    ) + 
-      geom_point() +
-      geom_line(aes(group = pair_id)) +
-      facet_wrap(~ timepoint) +
-      scale_y_continuous(name = "log Fold Change") +
-      scale_x_discrete(name = NULL)  +
-      scale_alpha_continuous(name = "-log10 qvalue", breaks = c(2,5,10,15))
-  )
-
-interaction_plots[[1]] + interaction_plots[[2]] + interaction_plots[[3]] + interaction_plots[[4]]
-
-ggsave(filename = here::here("results/receptor_ligand_filter/receptor_plot.pdf"), 
-       width = 297, height = 210, units = "mm")
+# # Graph interactions
+# # Create 4 plots: lung to placenta, lung to liver, liver to placenta, liver to liver
+# # use purrr map wiht 2 lists (messengers, targets) to subset and iterate ggplot
+# 
+# interaction_plots <-
+#   crossing(
+#   messenger_tissues, target_tissues
+# ) %>% 
+#   t() %>% 
+#   as.data.frame() %>% 
+#   as.list() %>% 
+#   map(.x = ., .f = ~ as.vector(.x)) %>% 
+#   map(
+#   .x = .,
+#   .f = ~ filter( named_receptor_ligand_pairs, tissue %in% .x, paired == "paired")
+# ) %>% 
+#   map(
+#     .x = .,
+#     .f = ~ ggplot(
+#       data = .x,
+#       aes(
+#         x = gene_class, y = log_fc_response, col = tissue, alpha = - log10(q_value_response)
+#       )
+#     ) + 
+#       geom_point() +
+#       geom_line(aes(group = pair_id)) +
+#       facet_wrap(~ timepoint) +
+#       scale_y_continuous(name = "log Fold Change") +
+#       scale_x_discrete(name = NULL)  +
+#       scale_alpha_continuous(name = "-log10 qvalue", breaks = c(2,5,10,15))
+#   )
+# 
+# interaction_plots[[1]] + interaction_plots[[2]] + interaction_plots[[3]] + interaction_plots[[4]]
+# 
+# ggsave(filename = here::here("results/receptor_ligand_filter/receptor_plot.pdf"), 
+#        width = 297, height = 210, units = "mm")
 
 # Add labels to top ligands/receptors (gene symbols)
+
+
+# Graph baseline expression of receptors on x and fold change of ligand on y
+
+wide_receptor_ligand_data <-
+  receptor_ligand_pairs %>% 
+  # add ligand data
+  left_join(
+    x = ., y = ligand_receptor_annotation,
+    by = c("ligand" = "ensembl_gene_id")
+  ) %>% 
+  rename(
+    log_fc_baseline_ligand = log_fc_baseline,
+    log_fc_response_ligand = log_fc_response,
+    q_value_baseline_ligand = q_value_baseline,
+    q_value_response_ligand = q_value_response,
+    tissue_ligand = tissue
+  ) %>% 
+  # add receptor data
+  left_join(
+    x = ., y = ligand_receptor_annotation,
+    by = c("receptor" = "ensembl_gene_id", "timepoint" = "timepoint")
+  ) %>% 
+  rename(
+    log_fc_baseline_receptor = log_fc_baseline,
+    log_fc_response_receptor = log_fc_response,
+    q_value_baseline_receptor = q_value_baseline,
+    q_value_response_receptor = q_value_response,
+    tissue_receptor = tissue
+  ) %>% 
+  # filter only receptor data from target tissues and ligand data from messenger tissues
+  filter(
+    tissue_ligand %in% c(messenger_tissues, "placentas")
+  ) %>% 
+  filter(
+    tissue_receptor %in% target_tissues
+  ) %>% 
+  # add gene names to ligands
+  right_join(
+    x = gene_names, y = .,
+    by = c( "ensembl_gene_id" = "receptor")
+  ) %>% 
+  # add gene names to receptors
+  right_join(
+    x = gene_names, y = .,
+    by = c( "ensembl_gene_id" = "ligand"), 
+    suffix = c("_ligand", "_receptor")
+  ) %>% 
+  as_tibble() %>% 
+  rename(
+    "ensembl_gene_id_ligand" = "ensembl_gene_id"
+  ) %>% 
+  mutate(
+    pair_id = paste(mgi_symbol_ligand, mgi_symbol_receptor, sep = ":")
+  )
+  
+## Save formatted data
+
+write_csv(x = wide_receptor_ligand_data, path = here::here("results/receptor_ligand_filter/receptor_ligand_wide_table.csv"))
+
+wide_receptor_ligand_data %>% 
+  ggplot(
+    aes(x = log_fc_baseline_receptor, y = log_fc_response_ligand, col = q_value_response_ligand < 0.05)
+  ) +
+  geom_point(alpha = 0.5) +
+  facet_grid( timepoint ~ tissue_ligand + tissue_receptor) +
+  ggrepel::geom_text_repel(
+    data = filter(wide_receptor_ligand_data, abs(log_fc_response_ligand) > 2, log_fc_baseline_receptor > 2),
+    aes(label = pair_id)
+    ) +
+  scale_color_brewer(name = "Significant Ligand DE", type = 'qual', palette = 2) +
+  scale_x_continuous(name = "log normalized receptor counts in target tissue") +
+  scale_y_continuous(name = "log fold change of ligands in messenger tissue") +
+  theme_bw() +
+  ggtitle(label = "Absolute expression of receptors compared with\nfold change in expression of their ligands")
+
+ggsave(filename = here::here("results/receptor_ligand_filter/receptor_base_ligand_fold_plot_full.pdf"), 
+       units = "mm", width = a4[1]*2, height = a4[2]*2)
+
+wide_receptor_ligand_data %>% 
+  filter(tissue_ligand == "maternal_lung") %>% 
+  ggplot(
+    aes(x = log_fc_baseline_receptor, y = log_fc_response_ligand, col = q_value_response_ligand < 0.05)
+  ) +
+  geom_point(alpha = 0.5) +
+  facet_grid( timepoint ~ tissue_receptor) +
+  ggrepel::geom_text_repel(
+    data = 
+      filter(
+        wide_receptor_ligand_data, 
+        tissue_ligand == "maternal_lung", 
+        abs(log_fc_response_ligand) > 2, 
+        log_fc_baseline_receptor > 2
+      ),
+    aes(label = pair_id)
+  ) +
+  scale_color_brewer(name = "Significant Ligand DE", type = 'qual', palette = 2) +
+  scale_x_continuous(name = "log normalized receptor counts in target tissue") +
+  scale_y_continuous(name = "log fold change of ligands in messenger tissue") +
+  coord_cartesian(xlim = c(0,10)) +
+  theme_bw() +
+  ggtitle(label = "Absolute expression of receptors compared with fold change in expression of their ligands in maternal lung")
+
+ggsave(filename = here::here("results/receptor_ligand_filter/receptor_base_ligand_fold_plot_lung.pdf"), 
+       units = "mm", width = a4[1], height = a4[2])
