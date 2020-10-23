@@ -280,3 +280,85 @@ wide_receptor_ligand_data %>%
 
 ggsave(filename = here::here("results/receptor_ligand_filter/receptor_base_ligand_fold_plot_lung.pdf"), 
        units = "mm", width = a4[1], height = a4[2])
+
+## Same plot, but track IL6:OSm through all timepoints
+
+wide_receptor_ligand_data %>% 
+  filter(
+    tissue_ligand == "maternal_lung", 
+    grepl("Il6", mgi_symbol_ligand) | grepl("Osm", mgi_symbol_receptor) |  grepl("Lifr", mgi_symbol_receptor) | grepl("Il6", mgi_symbol_receptor)
+  ) %>% 
+  ggplot(
+    aes(x = log_fc_baseline_receptor, y = log_fc_response_ligand, col = q_value_response_ligand < 0.05)
+  ) +
+  geom_point(alpha = 0.5) +
+  facet_grid( tissue_receptor ~ timepoint ) +
+  ggrepel::geom_text_repel(
+    aes(label = pair_id)
+  ) +
+  scale_color_brewer(name = "Significant Ligand DE", type = 'qual', palette = 2) +
+  scale_x_continuous(name = "log normalized receptor counts in target tissue") +
+  scale_y_continuous(name = "log fold change of ligands in messenger tissue") +
+  # coord_cartesian(xlim = c(0,10)) +
+  theme_bw() +
+  ggtitle(label = "Absolute expression of receptors compared with fold change in expression of their ligands in maternal lung")
+
+ggsave(filename = here::here("results/receptor_ligand_filter/IL6_osm_plot_lung.pdf"), 
+       units = "mm", width = a4[1], height = a4[2])
+
+## Check if receptors have a pattern over time when exposed to LPS
+wide_receptor_ligand_data %>% 
+  select(
+    timepoint, tissue_receptor, 
+    ensembl_gene_id_receptor, mgi_symbol_receptor,
+    log_fc_baseline_receptor, log_fc_response_receptor, 
+    q_value_response_receptor
+  ) %>% 
+  mutate(
+    lps_expression = log_fc_baseline_receptor + log_fc_response_receptor
+  ) %>% 
+  unique() %>% 
+  filter(
+    grepl("Osm", mgi_symbol_receptor) |  grepl("Lifr", mgi_symbol_receptor) | grepl("Il6", mgi_symbol_receptor)
+  ) %>% 
+  ggplot(
+    aes( x = timepoint, y = lps_expression, 
+         group = mgi_symbol_receptor, 
+         label = mgi_symbol_receptor, 
+         col = q_value_response_receptor < 0.1)
+  ) +
+  geom_line() +
+  facet_wrap(~ tissue_receptor) +
+  ggrepel::geom_text_repel() +
+  scale_color_brewer(name = "Significant (q<0.1)\nreceptor\nresponse to LPS", type = 'qual', palette = 2) +
+  theme_bw()
+  
+ggsave(filename = here::here("results/receptor_ligand_filter/IL6_Osm_receptor_responses.pdf"), 
+       units = "mm", width = a4[1], height = a4[2])
+
+## Check if receptors have a pattern over time when exposed to LPS
+wide_receptor_ligand_data %>% 
+  select(
+    timepoint, tissue_receptor, 
+    ensembl_gene_id_receptor, mgi_symbol_receptor,
+    log_fc_baseline_receptor, log_fc_response_receptor, 
+    q_value_response_receptor
+  ) %>% 
+  mutate(
+    lps_expression = log_fc_baseline_receptor + log_fc_response_receptor
+  ) %>% 
+  unique() %>% 
+  filter(
+    grepl("Osm", mgi_symbol_receptor) |  grepl("Lifr", mgi_symbol_receptor) | grepl("Il6", mgi_symbol_receptor)
+  ) %>% 
+  ggplot(
+    aes( x = timepoint, y = log_fc_response_receptor, 
+         group = mgi_symbol_receptor, 
+         label = mgi_symbol_receptor, 
+         col = q_value_response_receptor < 0.1)
+  ) +
+  geom_line() +
+  facet_wrap(~ tissue_receptor) +
+  ggrepel::geom_text_repel() +
+  scale_color_brewer(name = "Significant (q<0.1)\nreceptor\nresponse to LPS", type = 'qual', palette = 2) +
+  theme_bw()
