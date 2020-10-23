@@ -1,3 +1,5 @@
+#### Global setup ####
+
 fastq_files, = glob_wildcards('data/02_seqdata/{filename}.fq.gz')
 TISSUE_TYPES = ("placenta_maternal", "lung_maternal", "liver_maternal", "liver_fetal", "placenta_fetal")
 MODELS = ("placentas", "fetal_liver", "maternal_liver", "maternal_lung")
@@ -21,6 +23,8 @@ rule all:
     upsetr_plots = expand(
       "results/upsetr/{tissue}.pdf",
       tissue = MODELS)
+
+#### Quality controls ####
 
 rule md5:
   input:
@@ -72,6 +76,7 @@ rule trim_reads:
     '''
     seqtk trimfq -b 11 {input.fastq} > {output}
     '''
+#### Salmon quantification ####
 
 # Download mouse reference transcriptome from Gencode v23
 rule download_mouse:
@@ -149,6 +154,8 @@ rule salmon_quant:
             --threads {threads} \
     '''
     
+#### Metadata annotation ####
+
 # Import sample metadata
 rule metadata_import:
   input:
@@ -177,6 +184,8 @@ rule download_gene_data:
     "results/download_gene_data/gene_names.Rdata"
   script:
     "scripts/download_gene_data.R"
+
+#### Linear models for DE ####
 
 # Fit linear models for the 2 placentas
 # NOTE
@@ -271,6 +280,8 @@ rule vsd:
   script:
     'scripts/vsd.R'
 
+#### Enrichment analyses and fold summary ####
+
 # Perform enrichment across all ranked sets of genes
 rule enrichment_run:
   input:
@@ -304,6 +315,8 @@ rule heatmap_fold_change_format:
     maternal_lps_response = "results/heatmap_fold_change_format/maternal_lps_response_summary.csv"
   script:
     "scripts/heatmap_fold_change_format.R"
+
+#### Receptor-ligand analyses ####
 
 # List all genes involved in each protein complex for receptor/ligand pairs
 rule untangle_pairs:
