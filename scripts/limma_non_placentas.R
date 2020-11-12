@@ -56,7 +56,7 @@ design_check <-
 print(x = "Performing the following contrasts:")
 colnames(design_check)
 
-write_csv(x = as.data.frame(design_check), path = snakemake@output[['factor_design_matrix']])
+write_csv(x = as.data.frame(design_check), file = snakemake@output[['factor_design_matrix']])
 
 # Filter low expression genes and apply voom transformation
 
@@ -212,8 +212,8 @@ ggsave(filename = snakemake@output[['volcano_plots']], width = 11.7, height = 8.
 
 # Save gene-wise summaries 
 
-write_csv(x = result_summary_table, path = snakemake@output[['summary_csv']])
-write_rds(x = result_summary_table, path = snakemake@output[['summary_rds']])
+write_csv(x = result_summary_table, file = snakemake@output[['summary_csv']])
+write_rds(x = result_summary_table, file = snakemake@output[['summary_rds']])
 
 # Create ranked gene lists for GO enrichment analysis
 
@@ -235,7 +235,7 @@ fold_change_upregulated_genes <-
     group_keys(fold_change_grouped_tibble) %>% pull(contrast)
   )
 
-write_rds(x = fold_change_upregulated_genes, path = snakemake@output[['ranked_genes_upregulated']])
+write_rds(x = fold_change_upregulated_genes, file = snakemake@output[['ranked_genes_upregulated']])
 
 # Sort genes from lowest to highest FC to detect downregulation in pathways
 fold_change_downregulated_genes <-
@@ -248,4 +248,4 @@ fold_change_downregulated_genes <-
     group_keys(fold_change_grouped_tibble) %>% pull(contrast)
   )
 
-write_rds(x = fold_change_downregulated_genes, path = snakemake@output[['ranked_genes_downregulated']])
+write_rds(x = fold_change_downregulated_genes, file = snakemake@output[['ranked_genes_downregulated']])

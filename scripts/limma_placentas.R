@@ -80,7 +80,7 @@ colnames(design_check)
 # Negative for exposed foetal placenta, positive for foetal controls
 # High values mean greater response in maternal than in fetal placenta and vice versa
 
-write_csv(x = as.data.frame(design_check), path = snakemake@output[['factor_design_matrix']])
+write_csv(x = as.data.frame(design_check), file = snakemake@output[['factor_design_matrix']])
 
 # Filter low expression genes and apply voom transformation
 
@@ -221,19 +221,22 @@ ggplot(result_summary_table,
     )
   )
 
-ggsave(filename = snakemake@output[['volcano_plots']], width = 11.7, height = 8.3, units = "in", device = 'png', dpi = 'retina')
+ggsave(filename = snakemake@output[['volcano_plots']], 
+       width = 11.7, height = 8.3, units = "in", 
+       device = 'png', dpi = 'retina')
 
 
 # Save gene-wise summaries 
 
-write_csv(x = result_summary_table, path = snakemake@output[['summary_csv']])
-write_rds(x = result_summary_table, path = snakemake@output[['summary_rds']])
+write_csv(x = result_summary_table, file = snakemake@output[['summary_csv']])
+write_rds(x = result_summary_table, file = snakemake@output[['summary_rds']])
 
 # Create ranked gene lists for GO enrichment analysis
 
 fold_change_grouped_tibble <-
   fold_change %>% 
-  filter(grepl(pattern = 'exposure', x = contrast)) %>% 
+  filter( grepl( pattern = 'exposure', x = contrast)) %>% 
+  filter( abs(logFC) > snakemake@params[['fold_change_threshold']] ) %>% 
   mutate(gene_id = gsub(pattern = "\\..*", x = gene_id, replacement = "")) %>% 
   group_by(contrast)
 
@@ -248,7 +251,7 @@ fold_change_upregulated_genes <-
     group_keys(fold_change_grouped_tibble) %>% pull(contrast)
   )
   
-write_rds(x = fold_change_upregulated_genes, path = snakemake@output[['ranked_genes_upregulated']])
+write_rds(x = fold_change_upregulated_genes, file = snakemake@output[['ranked_genes_upregulated']])
 
 # Sort genes from lowest to highest FC to detect downregulation in pathways
 fold_change_downregulated_genes <-
@@ -261,4 +264,4 @@ fold_change_downregulated_genes <-
     group_keys(fold_change_grouped_tibble) %>% pull(contrast)
   )
 
-write_rds(x = fold_change_downregulated_genes, path = snakemake@output[['ranked_genes_downregulated']])
+write_rds(x = fold_change_downregulated_genes, file = snakemake@output[['ranked_genes_downregulated']])
