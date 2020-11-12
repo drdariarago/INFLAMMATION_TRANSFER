@@ -4,7 +4,7 @@ fastq_files, = glob_wildcards('data/02_seqdata/{filename}.fq.gz')
 TISSUE_TYPES = ("placenta_maternal", "lung_maternal", "liver_maternal", "liver_fetal", "placenta_fetal")
 MODELS = ("placentas", "fetal_liver", "maternal_liver", "maternal_lung")
 
-MIN_COUNTS = 5
+MIN_COUNTS = 10
 ALPHA = 0.05
 MIN_LOGFC = 0.5
 
@@ -200,6 +200,7 @@ rule limma_placentas:
     gene_data = "results/download_gene_data/gene_names.Rdata"
   output:
     factor_design_matrix = "results/limma_placentas/factor_design_matrix.csv",
+    count_distribution_plot = "results/limma_placentas/count_distribution.pdf",
     linear_models = "results/limma_placentas/fitted_model.Rdata",
     fdr_plot = "results/limma_placentas/fdr_plot.pdf",
     q_values_plot = "results/limma_placentas/q_value_distribution.pdf",

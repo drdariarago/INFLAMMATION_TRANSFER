@@ -24,7 +24,6 @@ experiment_data <-
 
 # Subset only the tissue of interest
 tissue_data <- 
-  tissue_data <- 
   experiment_data$samples %$%
   paste(maternal_fetal, tissue, sep = "_") %>% 
   magrittr::equals(snakemake@params[['tissue']]) %>% 
@@ -61,12 +60,29 @@ write_csv(x = as.data.frame(design_check), path = snakemake@output[['factor_desi
 
 # Filter low expression genes and apply voom transformation
 
+experiment_data$counts %>% 
+  as_tibble() %>% 
+  pivot_longer(
+    cols = everything(),
+    names_to = "sample", values_to = "counts"
+  ) %>% 
+  ggplot(
+    aes(x = counts, fill = sample)
+  ) +
+  geom_density(alpha = 0.3, col = "white") + 
+  geom_vline(xintercept = snakemake@params[['min_counts']]) +
+  scale_x_log10() +
+  ggtitle(label = "Count distribution") + 
+  theme(legend.position = "none")
+
+ggsave(filename = snakemake@output[['count_distribution_plot']], 
+       width = 210, height = 149, units = "mm")
+
 filtered_data <-
   filterByExpr(
     y = tissue_data, 
     design = design, 
-    min.count = snakemake@params[['min_counts']],
-    min.total.count = 1
+    min.count = snakemake@params[['min_counts']]
   ) %>% 
   tissue_data[., , keep.lib.sizes = T] %>% 
   voom(
@@ -178,8 +194,18 @@ ggplot(result_summary_table,
   coord_cartesian(xlim = c(-5,5), ylim = c(1E-13,1)) +
   scale_color_brewer(type = 'qual', direction = -1) +
   geom_hline(aes(yintercept = snakemake@params[['alpha']])) +
-  labs(col = 'Absolute LogFC over 0.5') + 
-  ggtitle(label = paste0('Fold-change vs q-values of ', snakemake@params[["tissue"]], ' contrasts'))
+  labs(
+    col = glue::glue(
+      'Absolute LogFC over {threshold}',
+      threshold = snakemake@params[['fold_change_threshold']]
+    )
+  ) + 
+  ggtitle(
+    label = glue::glue(
+      'Fold-change vs q-values of {tissue} contrasts',
+      tissue = snakemake@params[["tissue"]]
+    )
+  )
 
 ggsave(filename = snakemake@output[['volcano_plots']], width = 11.7, height = 8.3, units = "in", device = 'png', dpi = 'retina')
 
@@ -193,7 +219,8 @@ write_rds(x = result_summary_table, path = snakemake@output[['summary_rds']])
 
 fold_change_grouped_tibble <-
   fold_change %>% 
-  filter(grepl(pattern = 'exposure', x = contrast)) %>% 
+  filter( grepl( pattern = 'exposure', x = contrast)) %>% 
+  filter( abs(logFC) > snakemake@params[['fold_change_threshold']] ) %>% 
   mutate(gene_id = gsub(pattern = "\\..*", x = gene_id, replacement = "")) %>% 
   group_by(contrast)
 
