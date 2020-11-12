@@ -230,38 +230,3 @@ ggsave(filename = snakemake@output[['volcano_plots']],
 
 write_csv(x = result_summary_table, file = snakemake@output[['summary_csv']])
 write_rds(x = result_summary_table, file = snakemake@output[['summary_rds']])
-
-# Create ranked gene lists for GO enrichment analysis
-
-fold_change_grouped_tibble <-
-  fold_change %>% 
-  filter( grepl( pattern = 'exposure', x = contrast)) %>% 
-  filter( abs(logFC) > snakemake@params[['fold_change_threshold']] ) %>% 
-  mutate(gene_id = gsub(pattern = "\\..*", x = gene_id, replacement = "")) %>% 
-  group_by(contrast)
-
-# Sort genes from highest to lowest FC to detect upregulation in pathways
-fold_change_upregulated_genes <-
-  fold_change_grouped_tibble %>% 
-  arrange(-logFC, .by_group = TRUE) %>% 
-  group_map(
-    .f = ~ pull(.x, gene_id)
-  ) %>% 
-  set_names(
-    group_keys(fold_change_grouped_tibble) %>% pull(contrast)
-  )
-  
-write_rds(x = fold_change_upregulated_genes, file = snakemake@output[['ranked_genes_upregulated']])
-
-# Sort genes from lowest to highest FC to detect downregulation in pathways
-fold_change_downregulated_genes <-
-  fold_change_grouped_tibble %>% 
-  arrange(logFC, .by_group = TRUE) %>% 
-  group_map(
-    .f = ~ pull(.x, gene_id)
-  ) %>% 
-  set_names(
-    group_keys(fold_change_grouped_tibble) %>% pull(contrast)
-  )
-
-write_rds(x = fold_change_downregulated_genes, file = snakemake@output[['ranked_genes_downregulated']])

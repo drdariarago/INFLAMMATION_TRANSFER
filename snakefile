@@ -207,9 +207,7 @@ rule limma_placentas:
     q_values_plot_zoomed = "results/limma_placentas/q_value_distribution_zoomed.pdf",
     volcano_plots = "results/limma_placentas/volcano_plots.png",
     summary_csv = "results/limma_placentas/fold_change_summary.csv",
-    summary_rds = "results/limma_placentas/fold_change_summary.rds",
-    ranked_genes_upregulated = "results/limma_placentas/ranked_list_upregulated_genes.rds",
-    ranked_genes_downregulated = "results/limma_placentas/ranked_list_downregulated_genes.rds"
+    summary_rds = "results/limma_placentas/fold_change_summary.rds"
   params:
     min_counts = MIN_COUNTS,
     fold_change_threshold = MIN_LOGFC,
@@ -224,15 +222,14 @@ rule limma_non_placentas:
     gene_data = "results/download_gene_data/gene_names.Rdata"
   output:
     factor_design_matrix = "results/limma_{tissue}/factor_design_matrix.csv",
+    count_distribution_plot = "results/limma_{tissue}/count_distribution.pdf",
     linear_models = "results/limma_{tissue}/fitted_model.Rdata",
     fdr_plot = "results/limma_{tissue}/fdr_plot.pdf",
     q_values_plot = "results/limma_{tissue}/q_value_distribution.pdf",
     q_values_plot_zoomed = "results/limma_{tissue}/q_value_distribution_zoomed.pdf",
     volcano_plots = "results/limma_{tissue}/volcano_plots.png",
     summary_csv = "results/limma_{tissue}/fold_change_summary.csv",
-    summary_rds = "results/limma_{tissue}/fold_change_summary.rds",
-    ranked_genes_upregulated = "results/limma_{tissue}/ranked_list_upregulated_genes.rds",
-    ranked_genes_downregulated = "results/limma_{tissue}/ranked_list_downregulated_genes.rds"
+    summary_rds = "results/limma_{tissue}/fold_change_summary.rds"
   params:
     min_counts = MIN_COUNTS,
     fold_change_threshold = MIN_LOGFC,
@@ -277,7 +274,7 @@ rule vsd:
   output:
     variance_stabilized_counts = 'results/tximeta/vsd.Rdata'
   params:
-    min_counts = 9
+    min_counts = MIN_COUNTS
   script:
     'scripts/vsd.R'
 
@@ -286,17 +283,21 @@ rule vsd:
 # Perform enrichment across all ranked sets of genes
 rule enrichment_run:
   input:
-    ranked_genes = "results/limma_{model}/ranked_list_{up_or_down}_genes.rds"
+    limma_results = "results/limma_compile_results/limma_results_no_maternal_contrasts.csv"
   output:
-    raw_results = "results/gost_enrichment_run_{model}/gost_results_{up_or_down}.rds"
+    raw_results =  "results/gost_enrichment_run/go_{model}_{up_or_down}.rds",
+    threshold_plot = "results/gost_enrichment_run/thresholds_{model}_{up_or_down}.pdf"
   params: 
-    max_fdr = ALPHA
+    max_fdr = ALPHA,
+    min_log_fc = MIN_LOGFC,
+    model = "{model}",
+    up_or_down = "{up_or_down}"
   script:
     "scripts/gost_enrichment_run.R"
 
 # Format enrichment result to human readable tidy table
 rule enrichment_format:
-  input: "results/gost_enrichment_run_{model}/gost_results_{up_or_down}.rds"
+  input: "results/gost_enrichment_run/go_{model}_{up_or_down}.rds"
   output: 
     go_long_format = "results/gost_enrichment_format/enrichment_{model}_{up_or_down}_long.csv",
     go_wide_format = "results/gost_enrichment_format/enrichment_{model}_{up_or_down}_wide.csv"
