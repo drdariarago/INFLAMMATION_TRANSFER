@@ -97,10 +97,60 @@ phospho_sets <-
     .f = ~ column_to_rownames( .x, "ensembl_gene_id" ) %>% as.matrix
   )
   
-
-
 imap(
   .x = phospho_sets,
+  .f = ~ pathview(
+    gene.data = .x,
+    out.suffix = .y,
+    pathway.id =  pathways,
+    species = 'mmu',
+    gene.idtype = 'ENSEMBL',
+    kegg.native = TRUE,
+    multi.state = TRUE,
+    limit = list(
+      gene = c(-1.5,1.5),
+      cpd = 1
+    )
+  )
+)
+
+
+# Merge phospho and gene data 
+# Current approach: select the strongest if two genes have both data
+
+merged_data <-
+  bind_rows(
+    gene_data %>% filter(exposure == "response") %>% select(tissue, timepoint, ensembl_gene_id, logFC), 
+    phospho_data %>% select(tissue, timepoint, ensembl_gene_id, logFC)
+  ) %>% 
+    group_by(tissue, timepoint, ensembl_gene_id) %>% 
+    summarise(
+      logFC = max(abs(logFC)) * sign(logFC[which.max(abs(logFC))])
+    )
+
+merged_sets <-
+  tissues %>% 
+  purrr::set_names(.) %>% 
+  map(
+    .f = ~ filter(.data = merged_data, tissue == .x)
+  ) %>% 
+  map(
+    .f = ~ pivot_wider(
+      data = .x,
+      id_cols = ensembl_gene_id, 
+      names_from = timepoint, 
+      values_from = logFC
+    )
+  ) %>% 
+  modify(
+    .f = ~ filter( .x, is.na(ensembl_gene_id) == FALSE )
+  ) %>% 
+  modify(
+    .f = ~ column_to_rownames( .x, "ensembl_gene_id" ) %>% as.matrix
+  )
+
+imap(
+  .x = merged_sets,
   .f = ~ pathview(
     gene.data = .x,
     out.suffix = .y,
