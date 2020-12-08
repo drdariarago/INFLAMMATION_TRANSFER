@@ -8,7 +8,7 @@ library(biomaRt)
 ## Read files in
 
 results_path <- 
-  here::here('data/proteomics/Quant_TMM_EdgeR_4_experiments.xlsx')
+  snakemake@input[['results']]
 
 phospho_results <-
   results_path %>% 
@@ -54,25 +54,25 @@ phospho_results %>%
     contrast_id = NULL,
     uniprot_id = uniprot_gn_id
   ) %>% 
-  write_csv(x = ., file = here::here('results/phospho_import/fold_changes.csv'))
+  write_csv(x = ., file = snakemake@output[['results']])
 
-## Plot phospho raw data
-phospho_results %>% 
-  filter(
-    grepl(pattern = 'Liver', contrast_id)
-  ) %>% 
-  magrittr::extract(,2:9) %>%
-  as.matrix() %>% 
-  apply(., c(1,2), log10) %>% 
-  pheatmap::pheatmap(
-    mat = .,
-    scale = 'column'
-  )
+# ## Plot phospho raw data
+# phospho_results %>% 
+#   filter(
+#     grepl(pattern = 'Liver', contrast_id)
+#   ) %>% 
+#   magrittr::extract(,2:9) %>%
+#   as.matrix() %>% 
+#   apply(., c(1,2), log10) %>% 
+#   pheatmap::pheatmap(
+#     mat = .,
+#     scale = 'column'
+#   )
 
 ## Import raw data
 
 data_path <-
-  here::here('data/proteomics/All_tables_4_experiments.xlsx')
+  snakemake@input[['data']]
 
 phospho_data <-
   data_path %>% 

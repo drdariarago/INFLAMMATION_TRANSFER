@@ -318,6 +318,16 @@ rule heatmap_fold_change_format:
   script:
     "scripts/heatmap_fold_change_format.R"
 
+# Import phospho proteomic data
+rule phospho_import:
+  input:
+    results = 'data/proteomics/Quant_TMM_EdgeR_4_experiments.xlsx',
+    data = 'data/proteomics/All_tables_4_experiments.xlsx'
+  output:
+    results = 'results/phospho_import/fold_changes.csv'
+  script:
+    "scripts/phospho_import.R"
+    
 #### Receptor-ligand analyses ####
 
 # List all genes involved in each protein complex for receptor/ligand pairs
