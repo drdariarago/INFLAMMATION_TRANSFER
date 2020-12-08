@@ -328,6 +328,24 @@ rule phospho_import:
   script:
     "scripts/phospho_import.R"
     
+# Create pathview graphs from rnaseq and phospho proteomic data    
+rule pathview:
+  input:
+    rna = "results/limma_compile_results/limma_results_no_maternal_contrasts.csv",
+    phospho = "results/phospho_import/fold_changes.csv"
+  params:
+    tissues = ("fetal_liver", "placentas"),
+    pathways = ("mmu04064", "mmu04657", "mmu04062") 
+    # "mmu04514",  "mmu04668", "mmu03320",
+    # "mmu04020", "mmu04926", "mmu04920", "mmu04650", "mmu04620", "mmu04668",
+    # "mmu04330", "mmu04010")
+  output:
+    rna = directory("results/pathview/rnaseq"),
+    phospho = directory("results/pathview/phospho"),
+    merged = directory("results/pathview/merged")
+  script:
+    "scripts/pathview.R"
+
 #### Receptor-ligand analyses ####
 
 # List all genes involved in each protein complex for receptor/ligand pairs

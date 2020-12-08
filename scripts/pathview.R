@@ -5,26 +5,26 @@ library(tidyverse)
 library(magrittr)
 
 gene_data <-
-  here::here("results/limma_compile_results/limma_results_no_maternal_contrasts.csv") %>% 
+  snakemake@input[['rna']] %>% 
   read_csv() %>% 
   mutate(
     timepoint = factor(x = timepoint, levels = paste0("timepoint", c(2,5,12,24)))
   )
 
 phospho_data <-
-  here::here("results/phospho_import/fold_changes.csv") %>% 
+  snakemake@input[['phospho']] %>% 
   read_csv() %>% 
   mutate(
     timepoint = factor(x = timepoint, levels = paste0("timepoint", c(2,5,12,24)))
   )
 
-pathways <- "mmu04010"
-  # c("mmu04064", "mmu04657", "mmu04062", "mmu04514",  "mmu04668", "mmu03320", 
-    # "mmu04020", "mmu04926", "mmu04920", "mmu04650", "mmu04620", "mmu04668", 
-    # "mmu04330", "mmu04010")
+pathways <- snakemake@params[['pathways']]
+tissues <- snakemake@params[['tissues']]
 
-tissues <- 
-  c("fetal_liver", "placentas")
+snakemake@output[['phospho']] %>% 
+  dirname(.) %>% 
+  here::here() %>% 
+  dir.create( path = .)
 
 # Convert to gene by timepoint matrix for multi-state plotting
 
@@ -74,12 +74,13 @@ imap(
   )
 )
 
-# Move results to appropriate directory and clean up leftover files
+# Move RNA results to appropriate directory and clean up leftover files
+dir.create( path = here::here(snakemake@output[['rna']]))
 
 list.files(path = here::here(""), pattern = "mmu.*multi.png") %>% 
   file.rename(
     from = .,
-    to = here::here( "results/pathview/rnaseq", .)
+    to = here::here( snakemake@output[['rna']], .)
   )
 
 list.files(path = here::here(""), pattern = "mmu.*") %>% 
@@ -125,12 +126,14 @@ imap(
   )
 )
 
-# Move results to appropriate directory and clean up leftover files
+# Move phospho results to appropriate directory and clean up leftover files
+
+dir.create( path = here::here(snakemake@output[['phospho']]))
 
 list.files(path = here::here(""), pattern = "mmu.*multi.png") %>% 
   file.rename(
     from = .,
-    to = here::here( "results/pathview/phospho", .)
+    to = here::here( snakemake@output[['phospho']], .)
   )
 
 list.files(path = here::here(""), pattern = "mmu.*") %>% 
@@ -187,13 +190,13 @@ imap(
   )
 )
 
-
-# Move results to appropriate directory and clean up leftover files
+# Move merged results to appropriate directory and clean up leftover files
+dir.create( path = here::here(snakemake@output[['merged']]))
 
 list.files(path = here::here(""), pattern = "mmu.*multi.png") %>% 
   file.rename(
     from = .,
-    to = here::here( "results/pathview/merged", .)
+    to = here::here( snakemake@output[['merged']], .)
   )
 
 list.files(path = here::here(""), pattern = "mmu.*") %>% 
