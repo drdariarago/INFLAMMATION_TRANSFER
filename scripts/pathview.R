@@ -74,6 +74,17 @@ imap(
   )
 )
 
+# Move results to appropriate directory and clean up leftover files
+
+list.files(path = here::here(""), pattern = "mmu.*multi.png") %>% 
+  file.rename(
+    from = .,
+    to = here::here( "results/pathview/rnaseq", .)
+  )
+
+list.files(path = here::here(""), pattern = "mmu.*") %>% 
+  file.remove(.)
+
 # convert phospho data to protein to treatment matrix
 phospho_sets <-
   tissues %>% 
@@ -114,6 +125,16 @@ imap(
   )
 )
 
+# Move results to appropriate directory and clean up leftover files
+
+list.files(path = here::here(""), pattern = "mmu.*multi.png") %>% 
+  file.rename(
+    from = .,
+    to = here::here( "results/pathview/phospho", .)
+  )
+
+list.files(path = here::here(""), pattern = "mmu.*") %>% 
+  file.remove(.)
 
 # Merge phospho and gene data 
 # Current approach: select the strongest if two genes have both data
@@ -165,3 +186,15 @@ imap(
     )
   )
 )
+
+
+# Move results to appropriate directory and clean up leftover files
+
+list.files(path = here::here(""), pattern = "mmu.*multi.png") %>% 
+  file.rename(
+    from = .,
+    to = here::here( "results/pathview/merged", .)
+  )
+
+list.files(path = here::here(""), pattern = "mmu.*") %>% 
+  file.remove(.)
