@@ -22,7 +22,12 @@ rule all:
     receptor_ligand_map =  "results/match_orthologs/human_mouse_ligands_receptors.txt",
     upsetr_plots = expand(
       "results/upsetr/{tissue}.pdf",
-      tissue = MODELS)
+      tissue = MODELS
+    ),
+    pathview_graphs = expand(
+      "results/pathview/{data}",
+      data = ("rnaseq", "phospho", "merged")
+    )
 
 #### Quality controls ####
 
