@@ -383,3 +383,36 @@ rule match_orthologs:
     "results/match_orthologs/human_mouse_ligands_receptors.txt"
   shell:
     "scripts/match_orthologs.pl {input} {output}"
+
+#### Compare with direct placenta inflammation study ####
+## From     
+## Lien YC, Zhang Z, Barila G, Green-Brown A et al. 
+## Intrauterine Inflammation Alters the Transcriptome and Metabolome in Placenta. 
+## Front Physiol 2020;11:592689. PMID: 33250783
+## https://doi.org/10.3389/fphys.2020.592689
+#########################################################
+
+rule download_inflammation_study:
+  output: 
+    data = "data/direct_inflammation/GSE151728_count_gene.txt.gz",
+    metadata = "data/direct_inflammation/GSE151728_family.soft.gz"
+  shell:
+    '''
+    curl -o {output.data} ftp://ftp.ncbi.nlm.nih.gov/geo/series/GSE151nnn/GSE151728/suppl/GSE151728_count_gene.txt.gz 
+    curl -o {output.metadata} ftp://ftp.ncbi.nlm.nih.gov/geo/series/GSE151nnn/GSE151728/soft/GSE151728_family.soft.gz
+    '''
+## Perform Limma analysis on Lien 2020 data
+
+rule process_lien_results:
+  input:
+    "data/direct_inflammation/GSE151728_count_gene.txt.gz"
+  output:
+    hclust = "results/process_lien_results/pre_filtering_hclust.pdf",
+    voom = "results/process_lien_results/voom_post_filtering.pdf",
+    rds_results = "results/process_lien_results/fold_change_summary.rds",
+    volcano_plot = "results/process_lien_results/volcano_plot.pdf",
+    MA_plot = "results/process_lien_results/MA_plot.pdf"
+  params:
+    min_counts = MIN_COUNTS
+  script:
+    "scripts/process_lien_results.R"
