@@ -326,10 +326,11 @@ rule heatmap_fold_change_format:
 # Import phospho proteomic data
 rule phospho_import:
   input:
-    results = 'data/proteomics/Quant_TMM_EdgeR_4_experiments.xlsx',
-    data = 'data/proteomics/All_tables_4_experiments.xlsx'
+    results = "data/proteomics/20210202_second_run/Analysed_data_TMM_EdgeR_4_experiments__Jan_2021.xlsx"
   output:
-    results = 'results/phospho_import/fold_changes.csv'
+    genewise_results = 'results/phospho_import/genewise_results.rds',
+    genewise_fdr_plot = 'results/phospho_import/genewise_fdr_plot.pdf',
+    sitewise_results = 'results/phospho_import/sitewise_results.rds'
   script:
     "scripts/phospho_import.R"
     
