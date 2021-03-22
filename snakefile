@@ -28,6 +28,10 @@ rule all:
     pathview_graphs = expand(
       "results/pathview/{data}",
       data = ("rnaseq", "phospho", "merged")
+    lien_comparisons = expand(
+      "results/inflammation_comparison/{tissue}_{value}_plot.pdf",
+      tissue = ("placenta", "lung"),
+      value = ("baseline", "response")
     )
 
 #### Quality controls ####
