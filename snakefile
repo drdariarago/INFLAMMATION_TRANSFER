@@ -26,8 +26,9 @@ rule all:
           tissue = MODELS
     ),
     pathview_graphs = expand(
-      "results/pathview/{data}",
-      data = ("rnaseq", "phospho", "merged")
+          "results/pathview_{data}",
+          data = ("rnaseq", "phospho/sites")
+    ),
     lien_comparisons = expand(
       "results/inflammation_comparison/{tissue}_{value}_plot.pdf",
       tissue = ("placenta", "lung"),
@@ -337,22 +338,53 @@ rule phospho_import:
     "scripts/phospho_import.R"
     
 # Create pathview graphs from rnaseq and phospho proteomic data    
-rule pathview:
+rule pathview_rnaseq:
   input:
     rna = "results/limma_compile_results/limma_results_no_maternal_contrasts.csv",
-    phospho = "results/phospho_import/fold_changes.csv"
   params:
-    tissues = ("fetal_liver", "placentas"),
-    pathways = ("mmu04064", "mmu04657", "mmu04062") 
-    # "mmu04514",  "mmu04668", "mmu03320",
-    # "mmu04020", "mmu04926", "mmu04920", "mmu04650", "mmu04620", "mmu04668",
-    # "mmu04330", "mmu04010")
+    tissues = ("placentas", "fetal_liver"),
+    pathways = (
+      "mmu04064", "mmu04668", "mmu04020", "mmu04110", "mmu04210",
+      "mmu00190", "mmu04150", "mmu04010", "mmu04620", "mmu04062",
+      # "mmu03410", "mmu03420", "mmu03430", "mmu03450", # DNA repair
+      "mmu04060", "mmu04657", "mmu04810", "mmu04670",
+      "mmu04370", "mmu04012", "mmu04350", # angoigenesis
+      "mmu04068", "mmu04115", # oxidative stress
+      "mmu04530", # tight junctions/claudins
+      "mmu04514",
+      "mmu04658", "mmu04151", "mmu04630", "mmu04659", "mmu04660" # IL4
+      )
   output:
-    rna = directory("results/pathview/rnaseq"),
-    phospho = directory("results/pathview/phospho"),
-    merged = directory("results/pathview/merged")
+    rna = directory("results/pathview_rnaseq")
+  resources: 
+    pathview = 1
   script:
-    "scripts/pathview.R"
+    "scripts/pathview_rnaseq.R"
+
+rule pathview_phospho:
+  input:
+    phospho_genes = "results/phospho_import/genewise_results.rds",
+    phospho_sites = "results/phospho_import/sitewise_results.rds"
+  params:
+    tissues = ("placentas", "fetal_liver"),
+    pathways = (
+      "mmu04064", "mmu04668", "mmu04020", "mmu04110", "mmu04210",
+      "mmu00190", "mmu04150", "mmu04010", "mmu04620", "mmu04062",
+      # "mmu03410", "mmu03420", "mmu03430", "mmu03450", # DNA repair
+      "mmu04060", "mmu04657", "mmu04810", "mmu04670",
+      "mmu04370", "mmu04012", "mmu04350", # angoigenesis
+      "mmu04068", "mmu04115", # oxidative stress
+      "mmu04530", # tight junctions/claudins
+      "mmu04514",
+      "mmu04658", "mmu04151", "mmu04630", "mmu04659", "mmu04660" # IL4
+      )
+  output:
+    phospho_genes = directory("results/pathview_phospho/genes"),
+    phospho_sites = directory("results/pathview_phospho/sites")
+  resources: 
+    pathview = 1
+  script:
+    "scripts/pathview_phospho.R"
 
 #### Receptor-ligand analyses ####
 
