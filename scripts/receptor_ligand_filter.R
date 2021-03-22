@@ -242,9 +242,13 @@ wide_receptor_ligand_data %>%
   geom_point(alpha = 0.5) +
   facet_grid( timepoint ~ tissue_ligand + tissue_receptor) +
   ggrepel::geom_text_repel(
-    data = filter(wide_receptor_ligand_data, abs(log_fc_response_ligand) > 2, log_fc_baseline_receptor > 2),
+    data = filter(
+      wide_receptor_ligand_data, 
+      abs(log_fc_response_ligand) > 2, 
+      log_fc_baseline_receptor > 2
+    ),
     aes(label = pair_id)
-    ) +
+  ) +
   scale_color_brewer(name = "Significant Ligand DE", type = 'qual', palette = 2) +
   scale_x_continuous(name = "log normalized receptor counts in target tissue") +
   scale_y_continuous(name = "log fold change of ligands in messenger tissue") +
@@ -362,3 +366,45 @@ wide_receptor_ligand_data %>%
   ggrepel::geom_text_repel() +
   scale_color_brewer(name = "Significant (q<0.1)\nreceptor\nresponse to LPS", type = 'qual', palette = 2) +
   theme_bw()
+
+# Create table for manual selection of interesting ligands
+interesting_ligand_table <-
+  wide_receptor_ligand_data %>% 
+  filter(
+    log_fc_baseline_receptor > 3,
+    log_fc_baseline_ligand > 0.5,
+    log_fc_response_ligand > 0.5,
+    q_value_response_ligand < q_value_threshold,
+    timepoint %in% paste( "timepoint", c(2,5), sep = "")
+  ) %>% 
+  dplyr::select(
+    starts_with("mgi"), tissue_ligand, tissue_receptor, timepoint, log_fc_baseline_ligand, log_fc_response_ligand, starts_with("ensembl")
+  ) %>% 
+  group_by(mgi_symbol_ligand, tissue_ligand) %>% 
+  summarise(
+    mgi_symbol_receptors = unique(mgi_symbol_receptor) %>%  paste(., collapse = ":"),
+    timepoint = timepoint,
+    log_fc_baseline_ligand = mean(log_fc_baseline_ligand),
+    log_fc_response_ligand = log_fc_response_ligand,
+    ensembl_gene_id_ligand = ensembl_gene_id_ligand
+  ) %>%
+  distinct() %>%
+  pivot_wider(
+    names_from = timepoint, 
+    values_from = log_fc_response_ligand
+  ) %>% 
+  select(
+    mgi_symbol = mgi_symbol_ligand, tissue_ligand, 
+    log_baseline = log_fc_baseline_ligand, log_fc_2_hrs = timepoint2, log_fc_5_hrs = timepoint5,
+    mgi_symbol_receptors, ensembl_gene_id_ligand
+  )
+
+write_csv(
+  x = interesting_ligand_table, 
+  file = here::here("results/receptor_ligand_filter/interesting_ligands.csv")
+)
+
+# Final format: one row per ligand. Must contain expression in mat lung/liver at 2&5 hrs, plus base counts
+# Include only ligands with at least 1 receptor with log base counts > 3
+# Include only ligands with significant expression in at least one timepoint and logFC > 1, and base counts > 3
+
