@@ -19,7 +19,7 @@ gost_results_table <-
     contrast, source, term_id, term_name, term_size, significant, intersection_percent = intersection_size
   ) 
 
-write_csv(x = gost_results_table, path = snakemake@output[['go_long_format']])
+write_csv(x = gost_results_table, file = snakemake@output[['go_long_format']])
 
 gost_results_table_wider <-
   gost_results_table %>% 
@@ -27,4 +27,4 @@ gost_results_table_wider <-
     names_from = contrast, values_from = c(significant, intersection_percent)
   ) 
 
-write_csv(x = gost_results_table_wider, path = snakemake@output[['go_wide_format']])  
+write_csv(x = gost_results_table_wider, file = snakemake@output[['go_wide_format']])  

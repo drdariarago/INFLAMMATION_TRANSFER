@@ -15,8 +15,9 @@ rule all:
     multiqc_report = "reports/multiqc/multiqc.html",
     limma_results =  "results/limma_compile_results/limma_results_no_maternal_contrasts.csv",
     go_results = expand(
-      "results/gost_enrichment_format/enrichment_{models}_{up_or_down}_long.csv",
-      models = MODELS, up_or_down = ("upregulated", "downregulated")
+          "results/gost_enrichment_format/enrichment_{models}_{up_or_down}_long.csv",
+          models = MODELS, 
+          up_or_down = ("upregulated", "downregulated")
     ),
     fold_change_matrices = "results/heatmap_fold_change_format/response_matrix_list.rds",
     receptor_ligand_map =  "results/match_orthologs/human_mouse_ligands_receptors.txt",
@@ -290,11 +291,8 @@ rule enrichment_run:
   input:
     limma_results = "results/limma_compile_results/limma_results_no_maternal_contrasts.csv"
   output:
-    raw_results =  "results/gost_enrichment_run/go_{model}_{up_or_down}.rds",
-    threshold_plot = "results/gost_enrichment_run/thresholds_{model}_{up_or_down}.pdf"
+    raw_results =  "results/gost_enrichment_run/go_{model}_{up_or_down}.rds"
   params: 
-    max_fdr = ALPHA,
-    min_log_fc = MIN_LOGFC,
     model = "{model}",
     up_or_down = "{up_or_down}"
   script:

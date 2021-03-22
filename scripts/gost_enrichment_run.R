@@ -3,9 +3,7 @@ library(magrittr)
 library(gprofiler2)
 
 # Import parameters from snakemake
-min_log_fc = snakemake@params[['min_log_fc']]
-min_log_base_counts = 1
-max_fdr = snakemake@params[["max_fdr"]]
+# min_log_base_counts = 1
 direction = snakemake@params[['up_or_down']]
 model = snakemake@params[['model']]
 
@@ -14,37 +12,12 @@ limma_results <-
   # here::here("results/limma_compile_results/limma_results_no_maternal_contrasts.csv") %>%
   snakemake@input[['limma_results']] %>%
   read_csv() %>% 
-  filter(tissue == model)
+  filter(tissue == model) %>% 
+  filter(exposure == "response")
 
-# Plot thresholds vs values for QC
-limma_results %>% 
-  ggplot(aes(x = logFC)) + 
-  geom_density() + 
-  facet_wrap(exposure ~ timepoint, scales = "free") + 
-  geom_vline(
-    data = data.frame(x = min_log_base_counts, exposure = "baseline"),
-    aes(xintercept = x), col = 'red') +
-  geom_vline(
-    data = data.frame(x = min_log_fc, exposure = "response"),
-    aes(xintercept = x), col = 'blue') +
-  ggtitle(
-    glue::glue(
-      "Distribution and thresholds for base and fold change values in {model}"
-      )
-  )
-
-ggsave(
-  filename = snakemake@output[['threshold_plot']], 
-  width = 297, height = 210, units = 'mm'
-)
-
-# Set background gene expression as all genes with baseline log counts > 1
+# Set background gene expression as all responder genes across all timepoints
 background_genes <-
   limma_results %>% 
-  filter(
-    exposure == "baseline",
-    logFC > min_log_base_counts
-  ) %>% 
   pull(ensembl_gene_id) %>% 
   unique()
 
@@ -52,14 +25,10 @@ background_genes <-
 filtered_results <-
   if (direction == "upregulated") {
     limma_results %>% 
-      filter(exposure == "response") %>% 
-      filter( logFC > min_log_fc ) %>% 
-      arrange( -logFC )
+      arrange( -log10(q_value) * -sign(logFC) )
   } else if (direction == "downregulated") {
     limma_results %>% 
-      filter(exposure == "response") %>% 
-      filter( logFC < -min_log_fc ) %>% 
-      arrange( logFC )
+      arrange( -log10(q_value) * sign(logFC) )
   } else {
     print("Direction needs to be either 'downregulated' or 'upregulated'")
   }
@@ -87,7 +56,7 @@ gost_result_list <-
       domain_scope = "custom", 
       custom_bg = background_genes,
       correction_method = "gSCS",
-      user_threshold = max_fdr,
+      user_threshold = 0.05,
       significant = FALSE,
       measure_underrepresentation = FALSE
     )
