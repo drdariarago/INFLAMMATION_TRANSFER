@@ -9,6 +9,7 @@ library(biomaRt)
 
 results_path <- 
   snakemake@input[['results']]
+  # here::here("data/proteomics/20210202_second_run/Analysed_data_TMM_EdgeR_4_experiments__Jan_2021.xlsx")
 
 phospho_results <-
   results_path %>% 
@@ -64,13 +65,18 @@ genewise_annotated_phospho_results <-
   annotated_phospho_results %>% 
   dplyr::select(-Acc) %>% 
   group_by(tissue, timepoint, ensembl_gene_id, mgi_symbol) %>% 
+  arrange(.by_group = TRUE, p_value) %>% 
   summarise(
-    m_ctrl = mean(m_ctrl),
-    m_lps = mean(m_LPS),
-    m_log_fc = log2(m_lps/m_ctrl),
+    site_mad = ifelse(
+      n() > 1,
+      mad(log10(m_LPS/m_ctrl)),
+      NA
+    ),
+    min_log_fc = log2(first(m_LPS)/first(m_ctrl)),
+    p_value_min = first(p_value),
     n_sites = n(),
     n_sign_sites = sum(p_value < 0.05),
-    p_value = ifelse(
+    p_value_avg = ifelse(
       n() > 1,
       metap::sumlog(p_value) %$% p,
       p_value
@@ -78,9 +84,34 @@ genewise_annotated_phospho_results <-
   ) %>% 
   ungroup() %>% 
   mutate(
-    q_value = fdrtool::fdrtool(x = p_value, statistic = "pvalue") %$% qval
+    q_value_avg = fdrtool::fdrtool(x = p_value_avg, statistic = "pvalue") %$% qval,
+    q_value_min = fdrtool::fdrtool(x = p_value_min, statistic = "pvalue") %$% qval
   )
 
 dev.off()
 
+# Save lists of signed averaged and min q-values for enrichment testing
+
+
+
+# Check average distance from the mean fold-change in phosphorilation within each gene
+
 genewise_annotated_phospho_results %>% 
+  ggplot( aes (x = n_sites, y = site_mad)) +
+  geom_hex() + 
+  scale_x_log10() + 
+  geom_smooth() + 
+  viridis::scale_fill_viridis(trans = 'log') +
+  facet_wrap( ~ n_sign_sites > 0)
+
+genewise_annotated_phospho_results %>% 
+  ggplot( aes (x = n_sign_sites > 0, y = site_mad, group = n_sign_sites > 0)) +
+  geom_boxplot(varwidth = T, notch = T) + 
+  geom_smooth() + 
+  viridis::scale_fill_viridis(trans = 'log') + 
+  facet_wrap(~ cut_interval(log10(n_sites), length = .5)) +
+  ggtitle("Mean Absolute Deviation in logFC of sites within genes, split by significance \n 
+          facets are by log10 number of sites within a gene")
+
+genewise_annotated_phospho_results %>% 
+  write_rds(x = ., file = snakemake@output[["genewise_results"]])
