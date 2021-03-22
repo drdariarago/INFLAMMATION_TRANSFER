@@ -225,7 +225,6 @@ ggsave(filename = snakemake@output[['volcano_plots']],
        width = 11.7, height = 8.3, units = "in", 
        device = 'png', dpi = 'retina')
 
-
 # Save gene-wise summaries 
 
 write_csv(x = result_summary_table, file = snakemake@output[['summary_csv']])

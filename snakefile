@@ -469,3 +469,4 @@ rule inflammation_comparison:
     log_fc_threshold = 0.25
   script:
     "scripts/inflammation_comparison.R"
+

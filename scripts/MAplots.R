@@ -1,6 +1,9 @@
 library(tidyverse)
 library(ggrepel)
 
+## Test MA - just for placenta fetal (look at MA_responses_all_tissues.R 
+## for a version for all tissues)
+
 limma_coefs <- 
   readRDS(here::here("results/limma/limma_coefs.Rdata"))
 
@@ -41,7 +44,7 @@ done <-
     timepoint = 
       factor(timepoint, 
              levels = paste0("timepoint", c(2, 5, 12, 24)), 
-             labels = paste0(c(2, 5, 12, 24), " hours after exposure" ))
+             labels = paste0(c(2, 5, 12, 24), "hours after exposure" ))
   )
 
 placenta_fetal_MA <-
