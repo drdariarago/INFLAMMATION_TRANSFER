@@ -37,8 +37,7 @@ upset(
   sets = c("timepoint24", "timepoint12", "timepoint5", "timepoint2"),
   keep.order = T,
   order.by = "freq",
-  empty.intersections = T,
-  mainbar.y.max = 1900
+  empty.intersections = T
 )
 
 dev.off()

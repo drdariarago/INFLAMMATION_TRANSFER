@@ -21,8 +21,8 @@ rule all:
     fold_change_matrices = "results/heatmap_fold_change_format/response_matrix_list.rds",
     receptor_ligand_map =  "results/match_orthologs/human_mouse_ligands_receptors.txt",
     upsetr_plots = expand(
-      "results/upsetr/{tissue}.pdf",
-      tissue = MODELS
+          "results/upsetr/{tissue}.pdf",
+          tissue = MODELS
     ),
     pathview_graphs = expand(
       "results/pathview/{data}",
