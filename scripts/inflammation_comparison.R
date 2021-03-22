@@ -3,172 +3,197 @@
 library(tidyverse)
 library(magrittr)
 
-q_value_threshold = 0.05
-log_fc_threshold = 0
-
-divergence = function(x,y){
-  difference = (x-y)^2
-  mean = (x^2+y^2)
-  sqrt(difference / mean)
-}
+q_value_threshold = snakemake@params[['q_value_threshold']]
+log_fc_threshold = snakemake@params[['log_fc_threshold']]
+a4_short_long = c(210, 297) * 2
 
 ## Import DE genes from inflammation study and from our study
 de_inflammation_results <-
-  here::here('results/process_lien_results/fold_change_summary.rds') %>% 
+  snakemake@input[['de_inflammation_results']] %>% 
   read_rds()
 
 de_transfer_results <-
-  read_csv(file = "results/limma_compile_results/limma_results_no_maternal_contrasts.csv") %>% 
-  filter(
-    tissue == "placentas",
-    timepoint == "timepoint5"
-  )
+  snakemake@input[['de_transfer_results']] %>% 
+  read_csv() %>%
+  mutate(
+    timepoint = factor(x = timepoint, levels = paste0("timepoint", c(2,5,12,24)))
+  ) %>% 
+  {list(
+    placenta = filter(
+      .data = .,
+      tissue == "placentas"
+    ),
+    lungs = filter(
+      .data = ., 
+      tissue == "maternal_lung"
+    )
+  )}
+  
 
 # Perform rank-correlation between the two studies
 # Filter only genes in both studies with FDR >= 0.05
 
 shared_genes <-
-  intersect(
-  de_inflammation_results$mgi_symbol, 
-  de_transfer_results$mgi_symbol
-)
+  map(
+    .x = de_transfer_results, 
+    .f = ~ intersect(
+      .x$mgi_symbol, 
+      de_inflammation_results$mgi_symbol
+    ) 
+  )
 
 filtered_de_transfer <-
   de_transfer_results %>% 
-  filter(mgi_symbol %in% shared_genes) %>% 
-  select(
-    ensembl_gene_id, mgi_symbol, q_value, log_fc = logFC, exposure
-  ) %>% 
-  pivot_wider(names_from = exposure, values_from = c(q_value, log_fc)) %>% 
-  select(
-    ensembl_gene_id, mgi_symbol, ave_expr = log_fc_baseline, q_value = q_value_response, log_fc = log_fc_response
-  )
+  map2(.x = ., .y = shared_genes, .f = ~ filter(.data = .x, mgi_symbol %in% .y)) %>% 
+  map(.x = ., .f = select, ensembl_gene_id, mgi_symbol, q_value, log_fc = logFC, exposure, timepoint) %>% 
+  map(.x = ., .f = pivot_wider, names_from = exposure, values_from = c(q_value, log_fc)) %>%
+  map(.x = ., .f = select, 
+      ensembl_gene_id, mgi_symbol, timepoint,
+      ave_expr = log_fc_baseline, q_value = q_value_response, log_fc = log_fc_response)
 
 filtered_de_inflammation <-
   de_inflammation_results %>% 
-  filter(mgi_symbol %in% shared_genes) %>% 
   select(
     mgi_symbol, q_value, ave_expr, log_fc
   ) 
 
 shared_de <-
-  inner_join(
-    x = filtered_de_transfer,
+  map(
+    .x = filtered_de_transfer,
+    .f = left_join,
     y = filtered_de_inflammation,
     by = "mgi_symbol",
     suffix = c("_transfer", "_inflamed")
-  ) %>% 
-  mutate(
-    divergence = divergence(log_fc_inflamed, log_fc_transfer)
-      # abs(log_fc_inflamed - log_fc_transfer) / (abs(log_fc_inflamed) + abs(log_fc_transfer))
   )
 
 # Filter only genes with significant logFC in at least one condition
 filtered_shared_de <-
-  shared_de %>% 
-  filter(
-    (q_value_transfer < 0.05) | (q_value_inflamed < 0.05),
-    (abs(log_fc_transfer) > 0.4 | abs(log_fc_inflamed) > 0.4)
+  map(
+    .x = shared_de,
+    .f = filter,
+    (q_value_transfer < q_value_threshold) | (q_value_inflamed < q_value_threshold),
+    (abs(log_fc_transfer) > log_fc_threshold) | (abs(log_fc_inflamed) > log_fc_threshold)
   ) %>% 
-  mutate(
+  map(
+    .x = .,
+    .f = mutate,
     de_class = case_when(
-      (q_value_transfer < 0.05) & (q_value_inflamed < 0.05) ~ "both",
-      (q_value_transfer < 0.05) ~ "transfer_only",
-      (q_value_inflamed < 0.05) ~ "inflamed_only",
-      TRUE ~ 'not_significant'
-    )
+      (q_value_transfer < q_value_threshold) & (q_value_inflamed < q_value_threshold) ~ "both",
+      (q_value_transfer < q_value_threshold) ~ "transfer_only",
+      (q_value_inflamed < q_value_threshold) ~ "inflamed_only",
+      TRUE ~ 'not_significant'),
+    alpha = (log_fc_inflamed / 5) ^2 +  log_fc_transfer^2  %>% sqrt
   )
+  
+write_rds(x = filtered_shared_de, file = snakemake@output[['filtered_shared_genes_list']])
 
-# Calculate correlation
-filtered_shared_de %$%
-  cor.test(log_fc_inflamed, log_fc_transfer)
-
-filtered_shared_de %$%
-  cor.test(log_fc_inflamed, log_fc_transfer, method = 'spearman')
-
-# Calculate and compare fold change and rank values
-filtered_shared_de %>% 
+# Calculate and compare baseline expression in inflamed and indirect placenta
+filtered_shared_de[[1]] %>% 
   ggplot(
     aes(
-      y = log_fc_transfer, x = log_fc_inflamed, 
-      col = de_class
-    )
-  ) +
-  geom_point(
-    aes(alpha = 
-          sqrt( (log_fc_inflamed / 5) ^2 + log_fc_transfer^2 ) 
-    )) +
-  geom_abline(slope = 1, intercept = 0, col = 'hotpink') +
-  geom_smooth(method = 'lm')  +
-  ggrepel::geom_text_repel(
-    data = filtered_shared_de %>%
-      filter(
-      abs(log_fc_transfer) > 0.45,
-      abs(log_fc_inflamed) > 0.45,
-      divergence < 0.4
-      ),
-    aes(label = mgi_symbol)
-  ) +
-  ggrepel::geom_text_repel(
-    data = filtered_shared_de %>%
-      filter(
-        abs(log_fc_inflamed) > 2.5
-        ),
-    aes(label = mgi_symbol)
-  ) +
-  ggrepel::geom_text_repel(
-    data = filtered_shared_de %>%
-      filter(
-        abs(log_fc_transfer) > 0.7,
-        abs(log_fc_inflamed) < 1,
-        divergence > 0.4
-      ),
-    aes(label = mgi_symbol)
-  ) +
-  ggtitle(label = "Log Fold Change of indirect and direct placenta inflammation at 5 hpe")
-
-filtered_shared_de %>% 
-  # mutate(
-  #   log_fc_inflamed = log_fc_inflamed %>% scale(center = F, scale = T) / 2,
-  #   log_fc_transfer = log_fc_transfer %>% scale(center = F, scale = T)
-  # ) %>% 
-  ggplot(
-    aes(
-      x = log_fc_inflamed,
-      y = log_fc_transfer,
+      y = ave_expr_inflamed, x = ave_expr_transfer, 
       label = mgi_symbol
     )
   ) +
   geom_hex() +
-  viridis::scale_fill_viridis(trans = 'log', breaks = c(1,10,100,500)) +
-  facet_wrap( ~ de_class) +
-  ggrepel::geom_text_repel(
-    data = . %>% filter( 
-      (log_fc_inflamed > 2.5) & de_class != 'transfer_only' | 
-        (abs(log_fc_transfer) > 0.7) & de_class != 'inflamed_only' |
-        ( (log_fc_transfer > 0.5) & (de_class == "both") )
-      ),
-    col = 'hotpink'
-  ) +
-  geom_abline(slope = 1, intercept = 0, color = 'blue')
-
-table(filtered_shared_de$de_class)
-
-filtered_shared_de %>% 
-  filter(
-    q_value_transfer < 0.05,
-    q_value_inflamed < 0.05
-  ) %>% 
-  ggplot(
-    aes(y = log_fc_transfer, x = log_fc_inflamed, col = de_class)
-  ) +
-  geom_point(alpha = .8) +
   geom_abline(slope = 1, intercept = 0, col = 'hotpink') +
-  # ggrepel::geom_text_repel(
-  #   data = filtered_shared_de %>%
-  #     filter(
-  #       de_class != "not_significant"
-  #     ),
-  #   aes(label = mgi_symbol, col = de_class) 
-  # ) +
-  ggtitle(label = "Log Fold Change of indirect and direct placenta inflammation at 5 hpe")
+  geom_smooth(method = 'lm', col = 'magenta')  +
+  facet_grid( de_class ~ timepoint) + 
+  viridis::scale_fill_viridis(trans = 'log', breaks = c(2,4,8,16,32,64,128), name = "number\nof genes") +
+  theme(legend.position = 'right') +
+  ggtitle(label = "Baseline expression of indirect and direct placenta inflammation at each timepoint")
+
+ggsave(
+  filename = snakemake@output[['placenta_baseline_plot']], 
+  width = a4_short_long[2], height = a4_short_long[1],
+  units = 'mm'
+)
+
+## Same but with fold change expression values
+
+filtered_shared_de[[1]] %>% 
+  ggplot(
+    aes(
+      y = log_fc_inflamed, x = log_fc_transfer, 
+      label = mgi_symbol
+    )
+  ) +
+  geom_hex() +
+  viridis::scale_fill_viridis(trans = 'log', breaks = c( 2^(2*0:5) )) +
+  geom_abline(slope = 1, intercept = 0, col = 'hotpink') +
+  geom_smooth(method = 'lm', col = 'magenta')  +
+  facet_grid( de_class ~ timepoint) + 
+  scale_y_continuous(limits = c(-3, 7.5)) +
+  theme(legend.position = 'right') +
+  ggrepel::geom_text_repel(
+    data = filtered_shared_de[[1]] %>% 
+      filter( 
+        ( abs(log_fc_transfer) > 0.3 & abs(log_fc_inflamed) > 1.5 & de_class == 'both' ) |
+          ( abs(log_fc_transfer) > 0.7 & de_class == 'transfer_only' ) |
+          ( abs(log_fc_inflamed) > 4 & de_class == 'inflamed_only' )
+      ), 
+    col = 'darkorange'
+  ) +
+  ggtitle(label = "logFoldChange of indirect and direct placenta inflammation at each timepoint")
+
+ggsave(
+  filename = snakemake@output[['placenta_response_plot']],
+  width = a4_short_long[2], height = a4_short_long[1],
+  units = 'mm'
+)
+
+## Compare baseline expression of inflamed placenta and inflamed lung
+
+# Calculate and compare baseline expression in inflamed and indirect placenta
+filtered_shared_de[[2]] %>% 
+  ggplot(
+    aes(
+      y = ave_expr_inflamed, x = ave_expr_transfer, 
+      label = mgi_symbol
+    )
+  ) +
+  geom_hex() +
+  geom_abline(slope = 1, intercept = 0, col = 'hotpink') +
+  geom_smooth(method = 'lm', col = 'magenta')  +
+  facet_grid( de_class ~ timepoint) + 
+  viridis::scale_fill_viridis(trans = 'log', breaks = c(2^c(1:7)), name = "number\nof genes") +
+  theme(legend.position = 'right') +
+  ggtitle(label = "Baseline expression of inflamed placenta and lung at each timepoint")
+
+ggsave(
+  filename = snakemake@output[['lung_baseline_plot']],
+  width = a4_short_long[2], height = a4_short_long[1],
+  units = 'mm'
+)
+
+## Compare expression of inflamed placenta and inflamed lung
+
+filtered_shared_de[[2]] %>% 
+  ggplot(
+    aes(
+      y = log_fc_inflamed, x = log_fc_transfer, 
+      label = mgi_symbol
+    )
+  ) +
+  geom_hex()+
+  geom_abline(slope = 1, intercept = 0, col = 'hotpink') +
+  geom_smooth(method = 'lm', col = 'magenta')  +
+  facet_grid( de_class ~ timepoint) + 
+  theme(legend.position = 'right') +
+  viridis::scale_fill_viridis(trans = 'log', breaks = c(3^c(1:8)), name = "number\nof genes") +
+  ggrepel::geom_text_repel(
+    data = filtered_shared_de[[2]] %>%
+      filter(
+        ( abs(log_fc_transfer) > 2.5 & abs(log_fc_inflamed) > 2.5 & de_class == 'both' ) |
+          ( abs(log_fc_transfer) > 2 & de_class == 'transfer_only' ) |
+          ( abs(log_fc_inflamed) > 2 & de_class == 'inflamed_only' )
+      ),
+    col = 'darkorange'
+  ) +
+  ggtitle(label = "Log Fold Change of indirect placenta and lung inflammation at 2 and 5 hpe")
+
+ggsave(
+  filename = snakemake@output[['lung_response_plot']], 
+  width = a4_short_long[2], height = a4_short_long[1], 
+  units = 'mm'
+)

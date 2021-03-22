@@ -417,3 +417,21 @@ rule process_lien_results:
     min_counts = MIN_COUNTS
   script:
     "scripts/process_lien_results.R"
+
+# Plot comparisons between Lien and our results
+
+rule inflammation_comparison:
+  input:
+    de_inflammation_results = "results/process_lien_results/fold_change_summary.rds",
+    de_transfer_results = "results/limma_compile_results/limma_results_no_maternal_contrasts.csv"
+  output:
+    filtered_shared_genes_list = "results/inflammation_comparison/filtered_shared_genes_list.rds",
+    placenta_baseline_plot = "results/inflammation_comparison/placenta_baseline_plot.pdf",
+    placenta_response_plot = "results/inflammation_comparison/placenta_response_plot.pdf",
+    lung_baseline_plot = "results/inflammation_comparison/lung_baseline_plot.pdf",
+    lung_response_plot = "results/inflammation_comparison/lung_response_plot.pdf"
+  params:
+    q_value_threshold = 0.05,
+    log_fc_threshold = 0.25
+  script:
+    "scripts/inflammation_comparison.R"
