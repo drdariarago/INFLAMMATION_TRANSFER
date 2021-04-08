@@ -6,17 +6,22 @@ library(edgeR)
 library(DESeq2)
 library(magrittr)
 library(tidyverse)
+library(patchwork)
 
 ## Import results as single data.frame
 
-results_path <-
+input_path <-
   here::here('data/proteomics/20210202_second_run/MaxQuant_table_all4exp_Jan_2021.xlsx')
 
+results_path <-
+  here::here('results/phospho_limma/liver')
+
 results_list <- 
-  results_path %>% 
+  input_path %>% 
   readxl::excel_sheets() %>% 
+  str_subset( pattern = "Liver") %>% 
   purrr::set_names() %>%
-  map(.f = readxl::read_xlsx, path = results_path)
+  map(.f = readxl::read_xlsx, path = input_path)
 
 all_sites <-
   results_list %>% 
@@ -31,11 +36,6 @@ results_matrix <-
       set_colnames( gsub( x = colnames(.), pattern = "Reporter Intensity_", replacement = "")) %>% 
       column_to_rownames( var = "LP_position")
   ) %>% 
-  imap(
-    ~ str_extract(string = .y, pattern = "(P[L,l]acenta|Liver)") %>% 
-      tolower %>% 
-      { set_colnames(.x, paste( ., colnames(.x), sep = "_" )) }
-  ) %>% 
   map_dfc(
     ~ rownames_to_column(.x, var = "LP_position") %>% 
       left_join( all_sites, .) %>% 
@@ -48,7 +48,7 @@ sample_info <-
   results_matrix %>%
   colnames %>%
   str_extract_all( pattern = "[[:alnum:]]{1,}", simplify = T ) %>%
-  set_colnames( c( "tissue", "treatment", "time", "replicate" ) ) %>%
+  set_colnames( c( "treatment", "time", "replicate" ) ) %>%
   set_rownames( colnames( results_matrix ) )
 
 site_info <-
@@ -68,7 +68,7 @@ experiment_data <-
     genes = site_info, 
     group = 
       sample_info %>% as_tibble %>% 
-      transmute( paste( tissue, treatment, time, sep = "_" ) ) %>%
+      transmute( paste( treatment, time, sep = "_" ) ) %>%
       pull
   ) %>% 
   calcNormFactors(method = "TMM")
@@ -79,7 +79,7 @@ design <-
   # then check if tissue baseline changes over time
   # then check if responses change over time
   model.matrix(
-    object = formula( ~ 0 + tissue / ( treatment * time ) ), 
+    object = formula( ~ time / treatment ), 
     data = sample_info %>% as.data.frame
   )
 
@@ -90,40 +90,187 @@ results_plot_data <-
   as_tibble( rownames = "site_id" ) %>%
   pivot_longer( 
     cols = contains("H"), 
-    names_to = c( "tissue", "treatment", "time", "replicate"), 
+    names_to = c( "treatment", "time", "replicate"), 
     names_sep = "_", 
     values_to = "counts"
   ) 
 
 results_plot_data %>% 
   ggplot(
-    aes( x = counts + 100 , col = tissue, lty = treatment)
+    aes( x = counts + 100 , lty = treatment )
   ) +
   geom_density() + 
   scale_x_log10() +
   geom_vline( xintercept = 8E4, col = "hotpink", lty = 3 ) +
-  geom_vline( xintercept = 2E3, col = "blue", lty = 3 )
+  geom_vline( xintercept = 1E3, col = "blue", lty = 3 )
 
-results_plot_data %>% 
-  group_by( site_id, tissue ) %>% 
-  summarise( MAD = mad(counts) )
+results_summary <-
+  results_plot_data %>% 
+  group_by(site_id) %>% 
+  summarise( 
+    MAD = mad(counts),
+    average = mean(counts) 
+  )
+
+results_summary %>% 
+  ggplot(
+    aes( x = average, y = MAD)
+  ) +
+  geom_hex() + 
+  geom_smooth(method = 'lm') +
+  scale_x_log10() +
+  scale_y_log10() +
+  viridis::scale_fill_viridis( trans = 'log', breaks = c( 2, 10, 100, 500) )
 
 ## Voom
 
-experiment_data %>% 
+pdf( file = here::here(results_path, "voom_plot.pdf") )
+
+filtered_experiment_data <-
+  experiment_data %>% 
   filterByExpr(
     y = ., 
-    design = design, 
-    min.count = 64
+    design = 
+      model.matrix(
+        object = formula( ~ 1 ),
+        data = sample_info %>% as.data.frame
+      ),
+    min.count = 5E3,
+    min.prop = .5
   ) %>% 
   experiment_data[., , keep.lib.sizes = T] %>% 
   voom(
     counts = .,
-    design = design,
+    design =  design, 
     lib.size = .$lib.size,
     plot = TRUE
   )
 
+dev.off()
+
 ## Limma 
 
-## fdr
+linear_model <-
+  lmFit(
+    object = filtered_experiment_data, 
+    design = filtered_experiment_data$design
+  ) %>% 
+  eBayes()
+
+write_rds(x = linear_model, file = here::here( results_path, "linear_model.rds" ) )
+
+## Volcano and MA plots
+
+volcano_2H <-
+  linear_model %>% 
+  topTable(coef = "time2H:treatmentLPS", number = Inf, adjust.method = 'none', sort.by = 'P') %>% 
+  as_tibble() %>% 
+  ggplot(
+    aes( x = logFC, y = P.Value)
+  ) + 
+  geom_hex() + 
+  geom_hline( yintercept = 0.05) +
+  scale_y_log10() +
+  viridis::scale_fill_viridis( trans = 'log' )
+
+volcano_5H <-
+  linear_model %>% 
+  topTable(coef = "time5H:treatmentLPS", number = Inf, adjust.method = 'none', sort.by = 'P') %>% 
+  as_tibble() %>% 
+  ggplot(
+    aes( x = logFC, y = P.Value)
+  ) + 
+  geom_hex() + 
+  geom_hline( yintercept = 0.05) +
+  scale_y_log10() +
+  viridis::scale_fill_viridis( trans = 'log' )
+
+MA_2H <- 
+  linear_model %>% 
+  topTable(coef = "time2H:treatmentLPS", number = Inf, adjust.method = 'none', sort.by = 'P') %>% 
+  as_tibble() %>% 
+  ggplot(
+    aes( x = AveExpr, y = logFC)
+  ) + 
+  geom_hex() +
+  viridis::scale_fill_viridis( trans = 'log' )
+
+MA_5H <- 
+  linear_model %>% 
+  topTable(coef = "time5H:treatmentLPS", number = Inf, adjust.method = 'none', sort.by = 'P') %>% 
+  as_tibble() %>% 
+  ggplot(
+    aes( x = AveExpr, y = logFC)
+  ) + 
+  geom_hex() +
+  viridis::scale_fill_viridis( trans = 'log' )
+
+(volcano_2H + MA_2H) / (volcano_5H + MA_5H)
+
+ggsave(filename = here::here(results_path, "volcano_MA_plots.pdf"))
+
+## Calculate fdr for treatment::time
+
+q_values_meta <-
+  linear_model %$%
+  p.value %>% 
+  as_tibble(x = ., rownames = 'site_id') %>% 
+  select( site_id, contains('treatment') ) %>% 
+  pivot_longer(data = ., cols = -contains('site'), names_to = 'contrast', values_to = 'p_value') %>% 
+  mutate( gene_id = str_extract( string = site_id, pattern = "[:alnum:]*(?=_MOUSE)" ) ) %>% 
+  group_by( gene_id, contrast ) %>% 
+  summarise( meta_p = ifelse( n() > 1, metap::sumlog( p_value )$p, first( p_value) ) ) %>% 
+  ungroup %>% 
+  mutate( q_value = fdrtool::fdrtool(x = meta_p, statistic = "pvalue") %$% lfdr )
+
+q_values_base <-
+  linear_model %$%
+  p.value %>% 
+  as_tibble(x = ., rownames = 'site_id') %>% 
+  select( site_id, contains('treatment') ) %>% 
+  pivot_longer(data = ., cols = -contains('site'), names_to = 'contrast', values_to = 'p_value') %>% 
+  mutate( gene_id = str_extract( string = site_id, pattern = "[:alnum:]*(?=_MOUSE)" ) ) %>% 
+  mutate( q_value = fdrtool::fdrtool(x = p_value, statistic = "pvalue") %$% lfdr )
+
+q_values_meta %>% 
+  group_by( contrast ) %>% 
+  summarise(
+    sign_hits = sum(q_value < 0.05)
+  )
+
+# Merge with logFC values
+
+filtered_q_values<-
+  q_values_meta %>% 
+  select( -meta_p ) %>% 
+  pivot_wider(
+    names_from = contrast, values_from = q_value
+  ) %>% 
+  select(
+    gene_id = gene_id,
+    response_2H = `time2H:treatmentLPS`,
+    response_5H = `time5H:treatmentLPS`
+  ) %>% 
+  filter( response_2H < 0.05 | response_5H < 0.05 )
+
+filtered_results_table <-
+  topTable(linear_model, sort.by = "none", number = Inf) %>% 
+  as_tibble() %>% 
+  select( uniprot_id, mgi_id, position, AveExpr, contains("treatment")) %>% 
+  inner_join(., filtered_q_values, by = c("mgi_id" = "gene_id")) %>% 
+  arrange( mgi_id, position) %>% 
+  select(
+    uniprot_id, mgi_id, 
+    p_pos = position, 
+    average_expression = AveExpr,
+    response_2h_q_value = response_2H,
+    response_2h_log_fc = time2H.treatmentLPS,
+    response_5h_q_value = response_5H,
+    response_5h_log_fc = time5H.treatmentLPS,
+  ) %>% 
+  arrange( -min(response_2h_q_value, response_5h_q_value) )
+
+write_csv(
+  x = filtered_results_table, 
+  file = here::here(results_path, "significant_results.csv")
+  )
