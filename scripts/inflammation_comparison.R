@@ -3,17 +3,19 @@
 library(tidyverse)
 library(magrittr)
 
-q_value_threshold = snakemake@params[['q_value_threshold']]
-log_fc_threshold = snakemake@params[['log_fc_threshold']]
-a4_short_long = c(210, 297) * 2
+q_value_threshold = 0.05
+log_fc_threshold = 0.25
+a4_short_long = c(210, 297)
 
 ## Import DE genes from inflammation study and from our study
 de_inflammation_results <-
-  snakemake@input[['de_inflammation_results']] %>% 
-  read_rds()
+  "results/process_lien_results/fold_change_summary.rds" %>% 
+  here::here() %>% 
+  read_rds() 
 
 de_transfer_results <-
-  snakemake@input[['de_transfer_results']] %>% 
+  "results/limma_compile_results/limma_results_no_maternal_contrasts.csv" %>% 
+  here::here() %>% 
   read_csv() %>%
   mutate(
     timepoint = factor(x = timepoint, levels = paste0("timepoint", c(2,5,12,24)))
@@ -85,7 +87,10 @@ filtered_shared_de <-
     alpha = (log_fc_inflamed / 5) ^2 +  log_fc_transfer^2  %>% sqrt
   )
   
-write_rds(x = filtered_shared_de, file = snakemake@output[['filtered_shared_genes_list']])
+write_rds(
+  x = filtered_shared_de, 
+  file = "results/inflammation_comparison/filtered_shared_genes_list.rds" %>% here::here()
+  )
 
 # Calculate and compare baseline expression in inflamed and indirect placenta
 filtered_shared_de[[1]] %>% 
@@ -104,7 +109,7 @@ filtered_shared_de[[1]] %>%
   ggtitle(label = "Baseline expression of indirect and direct placenta inflammation at each timepoint")
 
 ggsave(
-  filename = snakemake@output[['placenta_baseline_plot']], 
+  filename = "results/inflammation_comparison/placenta_baseline_plot.pdf" %>% here::here(), 
   width = a4_short_long[2], height = a4_short_long[1],
   units = 'mm'
 )
@@ -137,7 +142,7 @@ filtered_shared_de[[1]] %>%
   ggtitle(label = "logFoldChange of indirect and direct placenta inflammation at each timepoint")
 
 ggsave(
-  filename = snakemake@output[['placenta_response_plot']],
+  filename = "results/inflammation_comparison/placenta_response_plot.pdf" %>% here::here(),
   width = a4_short_long[2], height = a4_short_long[1],
   units = 'mm'
 )
@@ -161,7 +166,7 @@ filtered_shared_de[[2]] %>%
   ggtitle(label = "Baseline expression of inflamed placenta and lung at each timepoint")
 
 ggsave(
-  filename = snakemake@output[['lung_baseline_plot']],
+  filename = "results/inflammation_comparison/lung_baseline_plot.pdf" %>% here::here(),
   width = a4_short_long[2], height = a4_short_long[1],
   units = 'mm'
 )
@@ -193,7 +198,7 @@ filtered_shared_de[[2]] %>%
   ggtitle(label = "Log Fold Change of indirect placenta and lung inflammation at 2 and 5 hpe")
 
 ggsave(
-  filename = snakemake@output[['lung_response_plot']], 
+  filename = "results/inflammation_comparison/lung_response_plot.pdf", 
   width = a4_short_long[2], height = a4_short_long[1], 
   units = 'mm'
 )
