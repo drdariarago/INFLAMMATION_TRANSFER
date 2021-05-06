@@ -27,7 +27,7 @@ rule all:
     ),
     pathview_graphs = expand(
           "results/pathview_{data}",
-          data = ("rnaseq", "phospho/sites")
+          data = ("rnaseq") # "phospho/sites"
     ),
     lien_comparisons = expand(
       "results/inflammation_comparison/{tissue}_{value}_plot.pdf",
@@ -385,7 +385,7 @@ rule pathview_phospho:
     pathview = 1
   script:
     "scripts/pathview_phospho.R"
-
+ 
 #### Receptor-ligand analyses ####
 
 # List all genes involved in each protein complex for receptor/ligand pairs
