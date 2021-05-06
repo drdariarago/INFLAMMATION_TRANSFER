@@ -11,15 +11,19 @@ library(patchwork)
 ## Import results as single data.frame
 
 input_path <-
-  here::here('data/proteomics/20210202_second_run/MaxQuant_table_all4exp_Jan_2021.xlsx')
+  snakemake@input[['data']]
 
 results_path <-
-  here::here('results/phospho_limma/liver')
+  snakemake@params[['output_path']]
 
 results_list <- 
   input_path %>% 
   readxl::excel_sheets() %>% 
-  str_subset( pattern = "Liver") %>% 
+  str_subset( pattern = 
+                ifelse(
+                  grepl(pattern = "liver", x = results_path,),
+                  "Liver", "P[L,l]acenta")
+  ) %>% 
   purrr::set_names() %>%
   map(.f = readxl::read_xlsx, path = input_path)
 
@@ -74,10 +78,8 @@ experiment_data <-
   calcNormFactors(method = "TMM")
 
 design <-
-  # Set independent tissue baselines, 
-  # then check for shared response to treatment
-  # then check if tissue baseline changes over time
-  # then check if responses change over time
+  # check if tissue baseline changes over time
+  # then check if responses are significant at each timepoint
   model.matrix(
     object = formula( ~ time / treatment ), 
     data = sample_info %>% as.data.frame
@@ -205,9 +207,10 @@ MA_5H <-
   geom_hex() +
   viridis::scale_fill_viridis( trans = 'log' )
 
-(volcano_2H + MA_2H) / (volcano_5H + MA_5H)
+(volcano_2H + MA_2H) / (volcano_5H + MA_5H) +
+  plot_annotation( title = glue::glue("Volcano and MA plots for {snakemake@params[['tissue']]}") )
 
-ggsave(filename = here::here(results_path, "volcano_MA_plots.pdf"))
+ggsave( filename = here::here(results_path, "volcano_MA_plots.pdf"), units = 'mm', width = 297, height = 210 )
 
 ## Calculate fdr for treatment::time
 
@@ -274,3 +277,18 @@ write_csv(
   x = filtered_results_table, 
   file = here::here(results_path, "significant_results.csv")
   )
+
+
+full_join(
+  filtered_results_table %>% 
+    select( mgi_id, response_2h_q_value ) %>% 
+    filter( response_2h_q_value < 0.05 ) %>% 
+    arrange( response_2h_q_value ) %>% 
+    distinct(), 
+  filtered_results_table %>% 
+    select( mgi_id, response_5h_q_value ) %>% 
+    filter( response_5h_q_value < 0.05 ) %>% 
+    arrange( response_5h_q_value ) %>% 
+    distinct() 
+) %>% 
+  write_csv( x = ., file = snakemake@output[['significant_genes']] )

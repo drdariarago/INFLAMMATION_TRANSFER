@@ -33,6 +33,10 @@ rule all:
       "results/inflammation_comparison/{tissue}_{value}_plot.pdf",
       tissue = ("placenta", "lung"),
       value = ("baseline", "response")
+    ),
+    phospho_results = expand(
+      "results/phospho_limma/{tissue}/significant_results.csv",
+      tissue = ("liver", "placenta")
     )
 
 #### Quality controls ####
@@ -336,6 +340,20 @@ rule phospho_import:
     sitewise_results = 'results/phospho_import/sitewise_results.rds'
   script:
     "scripts/phospho_import.R"
+
+# Perform classic limma/voom analysis on phospho data
+rule phospho_limma:
+  input: 
+    data = 'data/proteomics/20210202_second_run/MaxQuant_table_all4exp_Jan_2021.xlsx'
+  output:
+    significant_results = "results/phospho_limma/{tissue}/significant_results.csv",
+    significant_genes = "results/phospho_limma/{tissue}/significant_genes.csv",
+    linear_model = "results/phospho_limma/{tissue}/linear_model.rds"
+  params:
+    output_path = 'results/phospho_limma/{tissue}',
+    tissue = "{tissue}"
+  script:
+    'scripts/phospho_limma.R'
     
 # Create pathview graphs from rnaseq and phospho proteomic data    
 rule pathview_rnaseq:
