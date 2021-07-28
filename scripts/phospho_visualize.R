@@ -2,7 +2,6 @@
 
 library(tidyverse)
 library(magrittr)
-library(ggplot2)
 
 site_results <-
   here::here("results/phospho_import/sitewise_results.rds") %>% 
@@ -132,10 +131,16 @@ phospho_data <-
         "LP_position", starts_with("Reporter")
       ) %>% 
       magrittr::set_names(
-        janitor::make_clean_names(string = names(.))
+        janitor::make_clean_names(
+          string = names(.) %>% 
+            gsub(pattern = "Reporter Intensity_", replacement = ""))
       ) %>% 
       column_to_rownames("lp_position")
   ) 
+
+phospho_data <-
+  here::here("results/phospho_normalize/normalized_results_list.rds") %>% 
+  readRDS()
 
 shared_sites <-
   phospho_data %>% 
@@ -144,15 +149,26 @@ shared_sites <-
 
 shared_pca_data <-
   phospho_data %>% 
+  set_names( 
+    names(.) %>% 
+      janitor::make_clean_names(parsing_option = 3) %>% 
+      str_extract(pattern = "(liver|placenta)")
+    ) %>% 
   map(
     .f = ~ .[rownames(.x) %in% shared_sites,]
-  ) %>% 
-  imap_dfc(
-    .f = ~ paste(colnames(.x), .y, sep = "_") %>% set_colnames(.x, .)
-  ) %>% 
-  filter(
-  across( everything(), .fns = ~ var(.x) > 0)
-  )
+  ) %>%
+  imap(
+    .f = ~ colnames(.x) %>% 
+      janitor::make_clean_names() %>% 
+      str_extract(string = ., pattern = "(lps|control)_[5,2]h_[:digit:]") %>% 
+      paste(.y, ., sep = "_") %>% 
+      set_colnames(.x, .)
+  ) %>%
+  reduce(.f = cbind)
+# %>% 
+#   filter(
+#     across( everything(), .fns = ~ var(.x) > 0)
+#   )
   
 phospho_pca_data <-
   shared_pca_data %>% 
@@ -210,34 +226,3 @@ dendextend::labels_colors(dendrogram) <-
 pdf(file = here::here('results/phospho_visualise/dendrogram.pdf'))
 plot(dendrogram)
 dev.off()
-
-## Run enrichment tests on each list, ranked by signed q-value
-
-# Create list of genes for each stage
-
-
-# ## MA plots for genes
-# 
-# gene_results %>% 
-#   ggplot(
-#     aes(
-#       x = (m_ctrl + m_lps) / 2,
-#       y = m_log_fc
-#     )
-#   ) +
-#   geom_hex() +
-#   viridis::scale_fill_viridis(trans = "log", breaks = c(1,5,25,125), direction = -1) +
-#   scale_x_log10() +
-#   # scale_y_continuous(limits = c(-2,2)) +
-#   facet_grid(timepoint ~ tissue) +
-#   geom_point(
-#     data = gene_results %>% filter(q_value < 0.05, abs(m_log_fc) > 1 )
-#   ) +
-#   ggrepel::geom_text_repel(
-#     data = gene_results %>% filter(q_value < 0.05, abs(m_log_fc) > 1 ),
-#     aes(label = mgi_symbol)
-#   ) +
-#   geom_rug(
-#     data = gene_results %>% filter(q_value < 0.05, abs(m_log_fc) > 1 ),
-#     alpha = 0.1
-#   )
