@@ -26,7 +26,7 @@ ui <- fluidPage(
                  actionButton(inputId = "run_regex", label = "Search")
         ),
         tabPanel("genelist",
-                 textAreaInput("genelist", label = "list of gene IDs", placeholder = "Adam1\nAdam2"),
+                 textAreaInput("genelist", label = "list of gene IDs", placeholder = "Adam10\nAdam11"),
                  actionButton(inputId = "run_genelist", label = "Search")
         )
       ),
@@ -50,23 +50,34 @@ server <- function(input, output){
 
 ## Filter genes of interest
 
-  rna_data <- eventReactive(input$run_regex,
-                            full_data %>% 
-                              filter( tissue %in% input$tissues ) %>% 
-                              filter( grepl(isolate(input$pattern), mgi_symbol) ) 
-  )
+  rna_data <- reactiveValues(data = NULL)
   
+  observeEvent( input$run_regex, 
+                rna_data$data <- 
+                  full_data %>% 
+                  filter( tissue %in% input$tissues ) %>%
+                  filter( grepl(isolate(input$pattern), mgi_symbol) )
+                )
+  
+  observeEvent( input$run_genelist,
+                rna_data$data <-
+                  full_data %>% 
+                  filter(tissue %in% input$tissues ) %>% 
+                  filter( 
+                    mgi_symbol %in% (input$genelist %>% strsplit(., "\\s+") %>% extract2(1) )
+                  )
+  )
 
 ## List of genes found
 output$genelist <- renderText(
-  rna_data() %>%
+  rna_data$data %>%
     pull(mgi_symbol) %>%
     unique()
 )
   
 ## Plot results
   output$time_series <- renderPlot(
-    rna_data() %>%
+    rna_data$data %>%
       ggplot(
         aes(
           x = timepoint, y = log_fc_response,
@@ -82,7 +93,7 @@ output$genelist <- renderText(
       theme(legend.position = 'bottom') +
       labs(shape = "significant", col = "log base counts") +
       ggrepel::geom_text_repel(
-        data = rna_data() %>%
+        data = rna_data$data %>%
           filter(q_value_response < isolate(input$q_val) ),
         aes(
           x = timepoint, y = log_fc_response, label = mgi_symbol
@@ -93,7 +104,7 @@ output$genelist <- renderText(
   
 ## MA plots
   output$ma <- renderPlot(
-    rna_data() %>% 
+    rna_data$data %>% 
       ggplot(
         aes(x = log_base_counts, y = log_fc_response,
             col = q_value_response < isolate(input$q_val), 
@@ -101,7 +112,7 @@ output$genelist <- renderText(
       ) +
       geom_point() +
       ggrepel::geom_text_repel(
-        data = rna_data() %>%
+        data = rna_data$data %>%
           filter(q_value_response < isolate(input$q_val) ),
         aes(
           x = log_base_counts, y = log_fc_response, 
