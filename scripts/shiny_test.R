@@ -51,9 +51,11 @@ ui <- fluidPage(
         tabPanel("Fold Change",
                  plotOutput("time_series")
         ),
-        tabPanel("TPM",
+        tabPanel("TPM time series",
                  plotOutput("tpm_plot")
-        )
+        ),
+        tabPanel("TPM heatmap",
+                 plotOutput("heatmap"))
       )
     )
   )
@@ -149,6 +151,30 @@ output$genelist <- renderText(
       theme_minimal() +
       theme(legend.position = 'bottom') +
       ggtitle("TPM over time") 
+  )
+  
+  output$heatmap <- renderPlot(
+    tpm_plot_data$tpm %>% 
+      select(sample_id, mgi_symbol, TPM) %>% 
+      pivot_wider(
+        id_cols = sample_id, 
+        names_from = mgi_symbol, 
+        values_from = TPM
+      ) %>% 
+      column_to_rownames("sample_id") %>% 
+      as.matrix() %>% 
+      t() %>% 
+      pheatmap::pheatmap(
+      mat = ., scale = "none",
+      annotation_col = tpm_plot_data$tpm %>%
+        select(sample_id, timepoint, exposure, tissue) %>% 
+        distinct() %>% 
+        column_to_rownames("sample_id"),
+      show_colnames = FALSE,
+      annotation_colors = list(
+        exposure = c(LPS = "orange", ctr = "blue")
+      )
+    )
   )
   
 }
