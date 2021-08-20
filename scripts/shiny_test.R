@@ -4,6 +4,7 @@
 
 library(shiny)
 library(tidyverse)
+library(magrittr)
 library(here)
 
 ## Load datasets
@@ -18,6 +19,9 @@ limma_data <-
   rename(log_base_counts = logFC_baseline, log_fc_response = logFC_response)
 
 # Raw TPM
+tpm_data <-
+  here::here("results/tpm_summary/tpm_tibble.rds") %>% 
+  read_rds()
 
 ### Define page layout
 ui <- fluidPage(
@@ -43,8 +47,14 @@ ui <- fluidPage(
       textOutput(outputId = "genelist")
     ),
     mainPanel(
-      plotOutput("time_series")
-      # plotOutput("ma")
+      tabsetPanel(
+        tabPanel("Fold Change",
+                 plotOutput("time_series")
+        ),
+        tabPanel("TPM",
+                 plotOutput("tpm_plot")
+        )
+      )
     )
   )
 )
@@ -53,17 +63,17 @@ server <- function(input, output){
 
 ## Filter genes of interest
 
-  rna_data <- reactiveValues(data = NULL)
+  rna_data <- reactiveValues(logfc = NULL)
   
   observeEvent( input$run_regex, 
-                rna_data$data <- 
+                rna_data$logfc <- 
                   limma_data %>% 
                   filter( tissue %in% input$tissues ) %>%
                   filter( grepl(isolate(input$pattern), mgi_symbol) )
                 )
-  
+
   observeEvent( input$run_genelist,
-                rna_data$data <-
+                rna_data$logfc <-
                   limma_data %>% 
                   filter(tissue %in% input$tissues ) %>% 
                   filter( 
@@ -73,14 +83,14 @@ server <- function(input, output){
 
 ## List of genes found
 output$genelist <- renderText(
-  rna_data$data %>%
+  rna_data$logfc %>%
     pull(mgi_symbol) %>%
     unique()
 )
   
-## Plot results
+## Fold change over time
   output$time_series <- renderPlot(
-    rna_data$data %>%
+    rna_data$logfc %>%
       ggplot(
         aes(
           x = timepoint, y = log_fc_response,
@@ -96,7 +106,7 @@ output$genelist <- renderText(
       theme(legend.position = 'bottom') +
       labs(shape = "significant", col = "log base counts") +
       ggrepel::geom_text_repel(
-        data = rna_data$data %>%
+        data = rna_data$logfc %>%
           filter(q_value_response < isolate(input$q_val) ),
         aes(
           x = timepoint, y = log_fc_response, label = mgi_symbol
@@ -105,28 +115,42 @@ output$genelist <- renderText(
       ggtitle("Log fold change over time")
   )
   
-## MA plots
-  output$ma <- renderPlot(
-    rna_data$data %>% 
+## TPM over time
+  
+  tpm_plot_data <- reactiveValues(tpm = NULL)
+  
+  observeEvent( input$run_regex,
+                tpm_plot_data$tpm <-
+                  tpm_data %>%
+                  filter( tissue %in% input$tissues ) %>%
+                  filter( grepl(isolate(input$pattern), mgi_symbol) )
+  )
+  
+  observeEvent( input$run_genelist,
+                tpm_plot_data$tpm <-
+                  tpm_data %>% 
+                  filter(tissue %in% input$tissues ) %>% 
+                  filter( 
+                    mgi_symbol %in% (input$genelist %>% strsplit(., "\\s+") %>% extract2(1) )
+                  )
+  )
+  
+  output$tpm_plot <- renderPlot(
+    tpm_plot_data$tpm %>%
       ggplot(
-        aes(x = log_base_counts, y = log_fc_response,
-            col = q_value_response < isolate(input$q_val), 
-            label = mgi_symbol)
-      ) +
-      geom_point() +
-      ggrepel::geom_text_repel(
-        data = rna_data$data %>%
-          filter(q_value_response < isolate(input$q_val) ),
         aes(
-          x = log_base_counts, y = log_fc_response, 
-          label = mgi_symbol
+          x = timepoint, y = TPM,
+          group = exposure, col = exposure
         )
       ) +
-      facet_grid(timepoint ~ tissue) +
-      labs(color = "significant") +
+      geom_smooth() +
+      geom_point() +
+      facet_grid(tissue ~ mgi_symbol, scales = "free") +
       theme_minimal() +
-      ggtitle("MA plot") 
+      theme(legend.position = 'bottom') +
+      ggtitle("TPM over time") 
   )
+  
 }
 
 shinyApp(ui = ui, server = server)
