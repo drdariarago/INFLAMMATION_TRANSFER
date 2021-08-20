@@ -24,7 +24,7 @@ sample_metadata <-
   as.data.frame() %>% 
   mutate(
     tissue2 = paste(maternal_fetal, tissue, sep = "_"),
-    tissue = str_replace(tissue2, "(maternal_placenta|fetal_placenta)", "placenta")
+    tissue = str_replace(tissue2, "(maternal_placenta|fetal_placenta)", "placentas")
   ) %>% 
   select(
     sample_id = names, tissue, tissue2, exposure, timepoint
