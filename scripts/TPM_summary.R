@@ -7,7 +7,7 @@ library(magrittr)
 library(tidyverse)
 
 experiment_data <-
-  here::here("results/tximeta/expression_results.Rdata") %>%
+  snakemake@input[['expression_results']] %>%
   readRDS() 
 
 ## Format as sample by gene tibble
@@ -45,7 +45,7 @@ filtered_data <-
 
 # Load MGI symbols 
 mgi_data <-
-  here::here("results/download_gene_data/gene_names.Rdata") %>% 
+  snakemake@input[['mgi_symbols']] %>% 
   read_rds()
 
 # Make longer tibble of gene counts
@@ -73,4 +73,4 @@ data_with_symbols <-
     by = "ensembl_gene_id"
   )
 
-write_rds(x = data_with_symbols, file = here::here("results/TPM_summary","tpm_tibble.rds"))
+write_rds(x = data_with_symbols, file = snakemake@output[['tpm_results']])

@@ -13,6 +13,7 @@ import re
 rule all:
   input: 
     multiqc_report = "reports/multiqc/multiqc.html",
+    tpm_results = "results/tpm_summary/tpm_tibble.rds",
     limma_results =  "results/limma_compile_results/limma_results_no_maternal_contrasts.csv",
     go_results = expand(
           "results/gost_enrichment_format/enrichment_{models}_{up_or_down}_long.csv",
@@ -199,6 +200,16 @@ rule download_gene_data:
     "results/download_gene_data/gene_names.Rdata"
   script:
     "scripts/download_gene_data.R"
+
+# Save TPM summary tibble
+rule tpm_summary:
+  input:
+    mgi_symbols = "results/download_gene_data/gene_names.Rdata",
+    expression_results = "results/tximeta/expression_results.Rdata"
+  output:
+    tpm_results = "results/tpm_summary/tpm_tibble.rds"
+  script:
+    "scripts/TPM_summary.R"
 
 #### Linear models for DE ####
 
