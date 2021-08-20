@@ -6,8 +6,9 @@ library(shiny)
 library(tidyverse)
 library(here)
 
-## Load dataset
-full_data <- 
+## Load datasets
+# Limma results
+limma_data <- 
   read_csv("../results/limma_compile_results/limma_results_no_maternal_contrasts.csv") %>%
   mutate(
     timepoint = factor( x = timepoint, levels = paste0("timepoint", c(2,5,12,24)))
@@ -15,6 +16,8 @@ full_data <-
   select(-contrast) %>%
   pivot_wider(names_from = exposure, values_from = c(q_value, logFC)) %>%
   rename(log_base_counts = logFC_baseline, log_fc_response = logFC_response)
+
+# Raw TPM
 
 ### Define page layout
 ui <- fluidPage(
@@ -54,14 +57,14 @@ server <- function(input, output){
   
   observeEvent( input$run_regex, 
                 rna_data$data <- 
-                  full_data %>% 
+                  limma_data %>% 
                   filter( tissue %in% input$tissues ) %>%
                   filter( grepl(isolate(input$pattern), mgi_symbol) )
                 )
   
   observeEvent( input$run_genelist,
                 rna_data$data <-
-                  full_data %>% 
+                  limma_data %>% 
                   filter(tissue %in% input$tissues ) %>% 
                   filter( 
                     mgi_symbol %in% (input$genelist %>% strsplit(., "\\s+") %>% extract2(1) )
