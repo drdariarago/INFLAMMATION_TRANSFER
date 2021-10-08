@@ -43,7 +43,8 @@ logs/
 results/
 
 # Binary results
-reports/
+reports/*
+!reports/*.Rmd
 *.html
 
 # Git system folders
