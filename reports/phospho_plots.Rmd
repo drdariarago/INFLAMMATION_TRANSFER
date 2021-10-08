@@ -1,0 +1,102 @@
+---
+title: "Phosphorilation plots"
+author: "Alfredo Rago"
+date: "08/10/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(magrittr)
+
+site_results <-
+  snakemake@input[[1]] %>% 
+  read_rds()
+
+# Create reverse log10 scale for volcanoes (uses package scales)
+reverse_log10 <- 
+  scales::trans_new(
+    name = "reverse_log10", 
+    transform = function(x){-log(x,10)}, 
+    inverse = function(x){10^(-x)}, 
+    breaks = scales::log_breaks(base = 10), 
+    domain = c(0,Inf)
+  )
+
+```
+
+
+```{r placenta volcano, fig.width = 15, fig.height = 10}
+
+## Volcano plot for sites
+
+site_results %>% 
+  filter( tissue == "placentas") %>% 
+  ggplot(
+    aes(
+      x = logFC,
+      y = p_value
+    )
+  ) +
+  geom_hex() + 
+  viridis::scale_fill_viridis(trans = "log", breaks = c(4^(1:7)), direction = -1) +
+  facet_wrap( ~ timepoint) +
+  scale_y_continuous(trans = reverse_log10, oob = scales::squish, limits = c(1, 1e-12)) +
+  scale_x_continuous(limits = c(-2, 2), oob = scales::squish) +
+  geom_hline(yintercept = 0.05, col = 'hotpink') +
+  ggrepel::geom_text_repel(
+    data = site_results %>% 
+      filter( 
+        tissue == "placentas",
+        (FDR < 1e-3 & abs(logFC) > 0) |
+          (FDR < 0.01 & logFC > 1) | 
+          (FDR < 0.01 & logFC < -1.5) 
+      ),
+    max.overlaps = 50,
+    aes(label = mgi_symbol)
+  ) +
+  theme_minimal() +
+  ggtitle(label = "Volcano plot for site-wise phosphorilation")
+
+ggsave(
+  here::here("reports/phospho_plots/placenta_phospho_volcano.pdf")
+)
+```
+
+```{r liver volcano, fig.width = 15, fig.height = 10}
+
+## Volcano plot for sites
+
+site_results %>% 
+  filter( tissue == "fetal_liver") %>% 
+  ggplot(
+    aes(
+      x = logFC,
+      y = p_value
+    )
+  ) +
+  geom_hex() + 
+  viridis::scale_fill_viridis(trans = "log", breaks = c(4^(1:7)), direction = -1) +
+  facet_wrap( ~ timepoint) +
+  scale_y_continuous(trans = reverse_log10, oob = scales::squish, limits = c(1, 1e-8)) +
+  scale_x_continuous(limits = c(-2, 2), oob = scales::squish) +
+  geom_hline(yintercept = 0.05, col = 'hotpink') +
+  ggrepel::geom_text_repel(
+    data = site_results %>% 
+      filter( 
+        tissue == "fetal_liver",
+        FDR < 5e-2 
+      ),
+    max.overlaps = 50,
+    aes(label = mgi_symbol)
+  ) +
+  theme_minimal() +
+  ggtitle(label = "Volcano plot for site-wise phosphorilation")
+
+ggsave(
+  here::here("reports/phospho_plots/liver_phospho_volcano.pdf")
+)
+
+```

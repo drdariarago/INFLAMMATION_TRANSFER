@@ -40,7 +40,8 @@ rule all:
     #   "results/phospho_limma/{tissue}/significant_results.csv",
     #   tissue = ("liver", "placenta")
     # ),
-    phospho_premade = 'results/phospho_import/sitewise_results.rds'
+    phospho_premade = 'results/phospho_import/sitewise_results.rds',
+    phospho_plots = 'reports/phospho_plots/phospho_plots.html'
 
 #### Quality controls ####
 
@@ -501,3 +502,11 @@ rule inflammation_comparison:
   script:
     "scripts/inflammation_comparison.R"
 
+### Reports ####### 
+
+rule phospho_plots:
+  input:
+    "results/phospho_import/sitewise_results.rds"
+  output:
+    "reports/phospho_plots/phospho_plots.html"
+  script:
