@@ -35,10 +35,12 @@ rule all:
       tissue = ("placenta", "lung"),
       value = ("baseline", "response")
     ),
-    phospho_results = expand(
-      "results/phospho_limma/{tissue}/significant_results.csv",
-      tissue = ("liver", "placenta")
-    )
+    # # My reanalyses of the blagoy data, removed for consistency 
+    # phospho_results = expand(
+    #   "results/phospho_limma/{tissue}/significant_results.csv",
+    #   tissue = ("liver", "placenta")
+    # ),
+    phospho_premade = 'results/phospho_import/sitewise_results.rds'
 
 #### Quality controls ####
 
