@@ -29,7 +29,8 @@ annotated_results <-
 
 #### Plot and save the upsetr plots ####
 
-pdf(file = snakemake@output[[1]], width = 6.67, height = 7.5)
+A4 = c(8.27, 11.69)
+pdf(file = snakemake@output[[1]], width = A4[2]/2, height = A4[1]/2, onefile = FALSE)
 
 upset(
   annotated_results,
