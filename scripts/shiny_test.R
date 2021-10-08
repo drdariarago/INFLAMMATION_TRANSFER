@@ -79,7 +79,11 @@ server <- function(input, output){
                   limma_data %>% 
                   filter(tissue %in% input$tissues ) %>% 
                   filter( 
-                    mgi_symbol %in% (input$genelist %>% strsplit(., "\\s+") %>% extract2(1) )
+                    mgi_symbol %in% ( 
+                      input$genelist %>% 
+                        strsplit(., "\\s+") %>% 
+                        unlist
+                    )
                   )
   )
 
@@ -141,12 +145,12 @@ output$genelist <- renderText(
     tpm_plot_data$tpm %>%
       ggplot(
         aes(
-          x = timepoint, y = TPM,
+          x = as.factor(timepoint), y = log10(TPM+1),
           group = exposure, col = exposure
         )
       ) +
-      geom_smooth() +
-      geom_point() +
+      geom_boxplot(aes(group = timepoint)) +
+      geom_jitter(height = 0, alpha = 0.7) +
       facet_grid(tissue ~ mgi_symbol, scales = "free") +
       theme_minimal() +
       theme(legend.position = 'bottom') +
@@ -164,6 +168,8 @@ output$genelist <- renderText(
       column_to_rownames("sample_id") %>% 
       as.matrix() %>% 
       t() %>% 
+      add(1) %>% 
+      log10() %>% 
       pheatmap::pheatmap(
       mat = ., scale = "none",
       annotation_col = tpm_plot_data$tpm %>%
