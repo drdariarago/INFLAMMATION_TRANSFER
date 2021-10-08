@@ -92,6 +92,27 @@ write_rds(
   file = "results/inflammation_comparison/filtered_shared_genes_list.rds" %>% here::here()
   )
 
+# Select top 100 up regulated genes in our and their experiment, then compare Venn diagram 
+filtered_shared_de %$% 
+  placenta %>% 
+  group_by(ensembl_gene_id) %>% 
+  summarise(
+    ensembl_gene_id = first(ensembl_gene_id),
+    mgi_symbol = first(mgi_symbol),
+    q_value_transfer = min(q_value_transfer),
+    q_value_inflamed = min(q_value_inflamed)
+  ) %>% 
+  mutate(
+    rank_transfer = dense_rank(q_value_transfer),
+    rank_inflamed = dense_rank(q_value_inflamed)
+  ) %>% 
+  filter(
+    rank_transfer < 300, rank_inflamed < 300
+  ) %>% 
+  slice_min(n = 10, order_by = rank_transfer)
+
+# No correlation until we hit 2-3000 genes
+
 # Calculate and compare baseline expression in inflamed and indirect placenta
 filtered_shared_de[[1]] %>% 
   ggplot(
@@ -202,3 +223,87 @@ ggsave(
   width = a4_short_long[2], height = a4_short_long[1], 
   units = 'mm'
 )
+
+interesting = c( 
+  paste0("Ccl", c(2,11,7,22,3,20)), 
+  paste0("Cxcl", c(2,5,10,11)),
+  paste0("Il", c("1a", "1b", 6, 10, 4, 18, 12)),
+  "Tnf", "Fgf1", "Fgf11", "Vegfb", 
+  paste0("Csf", 1:3)
+  )
+
+filtered_shared_de$placenta %>% 
+  # filter(de_class == "both") %>% 
+  ggplot(aes(x = log_fc_transfer, y = log_fc_inflamed, col = mgi_symbol %in% interesting, label = mgi_symbol)) + 
+  geom_point() + 
+  ggrepel::geom_text_repel(data = filtered_shared_de$placenta %>% filter(mgi_symbol %in% interesting ), max.overlaps = 20) +
+  facet_grid( timepoint ~ de_class) 
+
+
+## Manuscript version of the plot (just 5 hours)
+library(patchwork)
+# filtered_shared_de[[1]] %>% 
+#   mutate(de_class = fct_recode( 
+#     de_class,
+#     both = "Shared Response", 
+#     inflamed_only = "Specific to Focal Placenta", 
+#     transfer_only = "Absent from Focal Placenta"
+#   ))
+
+placenta_plot <-
+  filtered_shared_de[[1]] %>% 
+  filter(timepoint == "timepoint5") %>% 
+  ggplot(
+    aes(
+      x = log_fc_inflamed, y = log_fc_transfer, 
+      label = mgi_symbol
+    )
+  ) +
+  geom_hex() +
+  viridis::scale_fill_viridis(name = "number\nof genes", trans = 'log', breaks = c( 2^(2*0:5) )) +
+  geom_abline(slope = 1, intercept = 0, col = 'hotpink', lty = 'dashed') +
+  # geom_smooth(method = 'lm', col = 'magenta', alpha = 0.5)  +
+  facet_wrap( ~ de_class ) + 
+  scale_x_continuous(name = "Response in\nFocal Placenta Inflammation", limits = c(-3, 7.5)) +
+  theme(legend.position = 'right') +
+  ggrepel::geom_text_repel(
+    data = filtered_shared_de[[1]] %>% filter(timepoint == "timepoint5") %>% 
+      filter( 
+        ( abs(log_fc_transfer) > 0.3 & abs(log_fc_inflamed) > 1.5 & de_class == 'both' ) |
+          ( abs(log_fc_transfer) > 0.7 & de_class == 'transfer_only' ) |
+          ( abs(log_fc_inflamed) > 4 & de_class == 'inflamed_only' )
+      ), 
+    col = 'hotpink'
+  ) +
+  scale_y_continuous(name = "Response in\nIndirect Placenta Inflammation") +
+  theme_bw()
+
+lung_plot <- filtered_shared_de[[2]] %>% 
+  filter(timepoint == "timepoint5") %>% 
+  ggplot(
+    aes(
+      x = log_fc_inflamed, y = log_fc_transfer, 
+      label = mgi_symbol
+    )
+  ) +
+  geom_hex()+
+  geom_abline(slope = 1, intercept = 0, col = 'hotpink', lty = 'dashed') +
+  # geom_smooth(method = 'lm', col = 'magenta')  +
+  facet_wrap( ~ de_class ) + 
+  theme(legend.position = 'right') +
+  viridis::scale_fill_viridis(trans = 'log', breaks = c(2^(c(1:4)*2), 600), name = "number\nof genes") +
+  ggrepel::geom_text_repel(
+    data = filtered_shared_de[[2]] %>% filter(timepoint == "timepoint5") %>% 
+      filter(
+        ( abs(log_fc_transfer) > 2.5 & abs(log_fc_inflamed) > 2.5 & de_class == 'both' ) |
+          ( abs(log_fc_transfer) > 2 & de_class == 'transfer_only' ) |
+          ( abs(log_fc_inflamed) > 2 & de_class == 'inflamed_only' )
+      ),
+    col = 'hotpink'
+  ) +
+  scale_x_continuous(name = NULL) +
+  scale_y_continuous(name = "Response in\nFocal Lung Inflammation") +
+  theme_bw()
+
+lung_plot / placenta_plot
+
