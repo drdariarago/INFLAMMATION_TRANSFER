@@ -374,7 +374,7 @@ rule pathview_rnaseq:
   input:
     rna = "results/limma_compile_results/limma_results_no_maternal_contrasts.csv",
   params:
-    tissues = ("placentas", "fetal_liver"),
+    tissues = ("placentas", "fetal_liver", "maternal_lung"),
     pathways = (
       "mmu04064", "mmu04668", "mmu04020", "mmu04110", "mmu04210",
       "mmu00190", "mmu04150", "mmu04010", "mmu04620", "mmu04062",
@@ -510,3 +510,4 @@ rule phospho_plots:
   output:
     "reports/phospho_plots/phospho_plots.html"
   script:
+    "reports/phospho_plots.Rmd"
