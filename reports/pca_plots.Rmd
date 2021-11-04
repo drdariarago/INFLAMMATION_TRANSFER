@@ -1,0 +1,138 @@
+---
+title: "PCA_plots"
+author: "Alfredo Rago"
+date: "01/10/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+
+tpm_summary <- here::here("results/tpm_summary/tpm_tibble.rds") %>% 
+  read_rds()
+```
+
+```{r PCA}
+
+tpm_matrix <-
+  tpm_summary %>% 
+  select(
+    sample_id, ensembl_gene_id, TPM
+  ) %>% 
+  filter(
+   ensembl_gene_id != "ENSMUSG00000115016" 
+  ) %>% 
+  pivot_wider(
+    id_cols = ensembl_gene_id, names_from = sample_id, values_from = TPM
+  ) %>% 
+  column_to_rownames(var = "ensembl_gene_id") %>% 
+  as.matrix() %>% 
+  t()
+
+# Remove zero variance genes
+non_zero_variance_genes <- 
+  tpm_matrix %>% 
+  apply(., 2, var) %>% 
+  magrittr::is_greater_than(0) 
+
+tpm_pca <-
+  tpm_matrix[,non_zero_variance_genes] %>% 
+  prcomp(center = T, scale = T)
+
+pca_plot_data <-
+  tpm_pca$x %>% 
+  as_tibble(rownames = "sample_id") %>% 
+  right_join(
+    x = tpm_summary %>% select(-c(ensembl_gene_id, TPM, mgi_symbol)) %>% distinct(),
+    y = ., by = "sample_id"
+  )
+
+```
+
+```{r PCA plots}
+pca_plot_data %>% 
+  ggplot(aes( x = PC1, y = PC2, col = tissue2)) +
+  geom_point() +
+  facet_grid(exposure ~ timepoint) +
+  scale_color_brewer(type = 'qual')
+  
+```
+
+```{r tissue-wise pca}
+tpm_tissues <-
+  tpm_summary$tissue2 %>% 
+  unique %>% 
+  setNames(object = ., nm = .)
+
+tpm_matrices <-
+  tpm_tissues %>% 
+  map(
+    ~ filter(tpm_summary, tissue2 == .)
+  ) %>% 
+  map(
+    ~ select(.x, sample_id, ensembl_gene_id, TPM) %>% 
+      filter( ensembl_gene_id != "ENSMUSG00000115016" )
+  ) %>% 
+  map(
+    ~ pivot_wider(
+      data = .x,
+      id_cols = ensembl_gene_id, names_from = sample_id, values_from = TPM
+    ) %>% 
+      column_to_rownames(var = "ensembl_gene_id") %>% 
+      as.matrix() %>% 
+      t()
+  )
+
+# Remove zero variance genes
+tissues_non_zero_variance_genes <- 
+  map( tpm_matrices,
+       ~ apply(.x, 2, var) %>% 
+         magrittr::is_greater_than(0) 
+  )
+
+tissues_pca <-
+  map2(
+    .x = tpm_matrices, 
+    .y = tissues_non_zero_variance_genes,
+    ~ .x[, .y] %>% prcomp( center = T, scale = T)
+  )
+
+tissues_pca_plot_data <-
+  map_dfr(
+    tissues_pca, 
+    ~ .x$x[,1:5] %>% 
+      as_tibble(rownames = "sample_id"), .id = "tissue2"
+  ) %>% 
+  right_join(
+    x = tpm_summary %>% select(-c(ensembl_gene_id, TPM, mgi_symbol)) %>% distinct(),
+    y = ., by = c("sample_id", "tissue2")
+  )
+
+```
+
+```{r tissue PCA plots}
+
+tissues_pca_plot_data %>% 
+  ggplot(
+    aes(x = PC1, y = PC2, col = as.factor(timepoint) )
+  ) +
+  geom_point() +
+  facet_wrap( ~ tissue2, scales = 'free') +
+  scale_color_brewer(type = 'seq', palette = 3, name = "timepoint") +
+  theme(legend.position = c(.8,.2)) +
+  ggtitle("Temporal patterns across different tissues")
+
+
+tissues_pca_plot_data %>% 
+  ggplot(
+    aes(x = PC1, y = PC2, col = exposure )
+  ) +
+  geom_point() +
+  facet_wrap( ~ tissue2, scales = 'free') +
+  scale_color_brewer(type = 'qual', palette = 1, name = "treatment") +
+  theme(legend.position = c(.8,.2)) +
+  ggtitle("Treatment effects across different tissues")
+  
+```
+

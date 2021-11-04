@@ -1,0 +1,51 @@
+---
+title: "Raw reads report"
+author: "Alfredo Rago"
+date: "01/10/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+library(tidyverse)
+library(magrittr)
+
+reads_data <-
+  here::here("data/01_RNAqc/seq_report/qc.summary.csv") %>% 
+  read_csv2()
+```
+
+```{r average reads}
+
+reads_data %>% 
+  summarise(
+    across(
+      ends_with("reads"), 
+      list ( 
+        median = ~ median(.x) %>%
+          divide_by(1E6) %>% 
+          round(digits = 3), 
+        min = ~ min(.x) %>% 
+          divide_by((1E6)) %>% 
+          round(digits = 3),
+        max = ~ max(.x) %>% 
+          divide_by((1E6)) %>% 
+          round(digits = 3)
+      )
+    )
+  )
+
+```
+```{r reads plot}
+reads_data %>% 
+  ggplot(
+    aes(x = Clean_Reads/1e6)
+  ) +
+  geom_histogram(bins = 30) +
+  scale_x_continuous(name = "millions of reads") +
+  theme_minimal() +
+  ggtitle("Clean Reads per Library")
+
+```
+
