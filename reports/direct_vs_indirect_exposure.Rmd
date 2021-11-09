@@ -17,7 +17,7 @@ a4_short_long = c(210, 297)
 de_inflammation_results <-
   "results/process_lien_results/fold_change_summary.rds" %>% 
   here::here() %>% 
-  read_rds() 
+  read_rds()
 
 de_transfer_results <-
   "results/limma_compile_results/limma_results_no_maternal_contrasts.csv" %>% 
@@ -88,16 +88,21 @@ filtered_shared_de <-
     .f = mutate,
     de_class = case_when(
       (q_value_transfer < q_value_threshold) & (q_value_inflamed < q_value_threshold) ~ "both",
-      (q_value_transfer < q_value_threshold) ~ "transfer_only",
-      (q_value_inflamed < q_value_threshold) ~ "inflamed_only",
-      TRUE ~ 'not_significant'),
+      (q_value_transfer < q_value_threshold) ~ "indirect",
+      (q_value_inflamed < q_value_threshold) ~ "direct",
+      TRUE ~ 'not_significant') %>% 
+      factor(
+        x = ., 
+        levels = c("indirect", "both", "direct"),
+        labels = c("intratracheal instillation", "significant response in both", "intrauterine injection")
+      ),
     alpha = (log_fc_inflamed / 5) ^2 +  log_fc_transfer^2  %>% sqrt
   )
 
 map(.x = filtered_shared_de, .f = head)
 ```
 
-```{r plot inflammation, fig.width=8, fig.height=10}
+```{r plot placenta, fig.width=8, fig.height=5}
 
 placenta_plot <-
   filtered_shared_de[[1]] %>% 
@@ -108,32 +113,70 @@ placenta_plot <-
       label = mgi_symbol
     )
   ) +
+  geom_hline(yintercept = 0, lty = 'dashed', col = 'lightgrey') +
+  geom_vline(xintercept = 0, lty = 'dashed', col = 'lightgrey') +
   geom_hex(show.legend = F) +
   geom_abline(slope = 1, intercept = 0, col = 'hotpink', lty = 'dashed') +
+  geom_smooth(method = 'lm', col = 'yellow') +
   ggrepel::geom_text_repel(
     data = 
       filtered_shared_de[[1]] %>% 
       filter(timepoint == "timepoint5") %>% 
-      filter(!grepl("Gm.*", mgi_symbol)) %>% 
-      filter( 
-        ( abs(log_fc_transfer) > 0.3 & abs(log_fc_inflamed) > 1.5 & de_class == 'both' ) |
-          ( abs(log_fc_transfer) > 0.7 & de_class == 'transfer_only' ) |
-          ( abs(log_fc_inflamed) > 4 & de_class == 'inflamed_only' )
-      ), 
+      filter(!grepl("(Gm|Rik).*", mgi_symbol)) %>% 
+      mutate(
+        labelled_points = case_when(
+          de_class == "significant response in both" & abs(log_fc_transfer) > 0.3 & abs(log_fc_inflamed) > 1.5 ~ TRUE,
+          de_class == "intratracheal instillation" & abs(log_fc_transfer) > 0.75 ~ TRUE,
+          de_class == 'intrauterine injection' & abs(log_fc_inflamed) > 4 ~ TRUE
+        )
+      ) %>% 
+      filter(labelled_points == TRUE),
+    max.overlaps = Inf,
+    box.padding = .3,
+    min.segment.length = 1,
     aes(col = de_class), 
-    fontface = "bold"
+    fontface = "bold",
+    key_glyph = "rect"
   ) +
-  scale_x_continuous(name = "Response in Focal\nPlacenta Inflammation", limits = c(-3, 7.5)) +
-  scale_y_continuous(name = "Response in Indirect\nPlacenta Inflammation") +
+  scale_x_continuous(
+    name = "Placenta Response after\nintrauterine LPS injection",
+    limits = c(-2.4,7.3),
+    breaks = c(-2,0,2,4,6) 
+  ) +
+  scale_y_continuous(
+    name = "Placenta Response after\nintratracheal LPS instillation", 
+    limits = c(-2,4)
+  ) +
   viridis::scale_fill_viridis(
     trans = 'log', 
     breaks = scales::breaks_log(n = 5, base = 5),
     name = "number\nof genes",
-    limits = c(1,600)
+    limits = c(1,600), 
+    direction = -1,
+    option = "viridis"
   ) +
-  scale_color_brewer(type = 'qual') +
+  scale_color_brewer(
+    type = 'qual', 
+    palette = 2,
+    name = NULL
+  ) +
   theme_classic() +
-  theme(legend.position = 'right')
+  theme(
+    legend.position = c(0.15,0.8),
+    legend.background = element_blank(),
+    axis.line = element_blank(),
+    ) +
+  annotate(
+    y = -Inf, yend = -Inf, x = -2, xend = 6, geom = "segment"
+  ) +
+  annotate(
+    x = -Inf, xend = -Inf, y = -2, yend = 4, geom = "segment"
+  )
+
+placenta_plot
+```
+
+```{r plot lung}
 
 lung_plot <- filtered_shared_de[[2]] %>% 
   filter(timepoint == "timepoint5") %>% 
@@ -143,37 +186,63 @@ lung_plot <- filtered_shared_de[[2]] %>%
       label = mgi_symbol
     )
   ) +
-  geom_hex()+
+  geom_hline(yintercept = 0, lty = 'dashed', col = 'lightgrey') +
+  geom_vline(xintercept = 0, lty = 'dashed', col = 'lightgrey') +
+  geom_hex() +
   geom_abline(slope = 1, intercept = 0, col = 'hotpink', lty = 'dashed') +
+  geom_smooth(method = 'lm', col = 'yellow') +
   ggrepel::geom_text_repel(
-    data = filtered_shared_de[[2]] %>% filter(timepoint == "timepoint5") %>% 
-      filter(
-        ( abs(log_fc_transfer) > 2.5 & abs(log_fc_inflamed) > 2.5 & de_class == 'both' ) |
-          ( abs(log_fc_transfer) > 2 & de_class == 'transfer_only' ) |
-          ( abs(log_fc_inflamed) > 2 & de_class == 'inflamed_only' )
-      ),
+    data = filtered_shared_de[[2]] %>% 
+      filter(timepoint == "timepoint5") %>% 
+      mutate(
+        labelled_points = case_when(
+          de_class == "significant response in both" & abs(log_fc_transfer) > 2.5 & abs(log_fc_inflamed) > 2.5 ~ TRUE,
+          de_class == "intratracheal instillation" & abs(log_fc_transfer) > 2.2 ~ TRUE,
+          de_class == 'intrauterine injection' & abs(log_fc_inflamed) > 2 ~ TRUE
+        )
+      ) %>% 
+      filter(labelled_points == TRUE),
     aes(col = de_class), 
-    max.overlaps = 30,
+    max.overlaps = 30, 
+    box.padding = .3,
     fontface = "bold",
     show.legend = F
   ) +
-  scale_x_continuous(name = NULL) +
-  scale_y_continuous(name = "Response in Focal\nLung Inflammation") +
+  scale_x_continuous(
+    name = "Placenta Response after\nintrauterine LPS injection",
+    limits = c(-2.4,7.3),
+    breaks = c(-2,0,2,4,6) 
+  ) +
+  scale_y_continuous(
+    name = "Lung Response after\ninitratracheal LPS instillation", 
+    limits = c(-2,5) 
+  ) +
   viridis::scale_fill_viridis(
     trans = 'log', 
     breaks = scales::breaks_log(n = 5, base = 5), 
     name = "number\nof genes",
-    limits = c(1,600)
+    limits = c(1,600), 
+    direction = -1,
+    option = 'viridis'
   ) +
-  scale_color_brewer(type = 'qual') +
+  scale_color_brewer(type = 'qual', palette = 2) +
   theme_classic() +
-  theme(legend.position = 'right')
+  theme(
+    legend.position = c(0.1,0.8),
+    legend.background = element_blank(),
+    axis.line = element_blank()
+      ) +
+  annotate(
+    y = -Inf, yend = -Inf, x = -2, xend = 6, geom = "segment"
+  ) +
+  annotate(
+    x = -Inf, xend = -Inf, y = -2, yend = 4, geom = "segment"
+  )
 
-lung_plot / placenta_plot
-
+lung_plot 
 ```
 
-```{r plot livers}
+```{r plot livers, fig.width=8, fig.height=5}
 
 de_livers <-
   "results/limma_compile_results/limma_results_no_maternal_contrasts.csv" %>% 
@@ -184,7 +253,8 @@ de_livers <-
   ) %>% 
   filter(
     grepl("liver", tissue),
-    exposure == "response"
+    exposure == "response",
+    timepoint == "timepoint5"
   ) %>% 
   select(
     tissue, timepoint, ensembl_gene_id, mgi_symbol, log_fc = logFC, q_value
@@ -198,34 +268,141 @@ de_livers <-
   mutate(
     de_class = case_when(
       q_value_fetal_liver < q_value_threshold & q_value_maternal_liver < q_value_threshold ~ 'both',
-      q_value_fetal_liver < q_value_threshold & q_value_maternal_liver >= q_value_threshold ~ 'fetal only',
-      q_value_fetal_liver >= q_value_threshold & q_value_maternal_liver < q_value_threshold ~ 'maternal only'
-    )
+      q_value_fetal_liver < q_value_threshold & q_value_maternal_liver >= q_value_threshold ~ 'fetal',
+      q_value_fetal_liver >= q_value_threshold & q_value_maternal_liver < q_value_threshold ~ 'maternal'
+    ) %>% 
+      factor(
+        x = ., 
+        levels = c('fetal', 'both', 'maternal'), 
+        labels = c('foetal response', 'shared response', 'maternal response')
+      )
   )
 
-de_livers %>% 
+livers_plot <-
+  de_livers %>% 
   ggplot(
     aes(
       x = log_fc_maternal_liver,
       y = log_fc_fetal_liver
     )
   ) +
-  geom_hex() +
+  geom_hline(yintercept = 0, lty = 'dashed', col = 'lightgrey') +
+  geom_vline(xintercept = 0, lty = 'dashed', col = 'lightgrey') +
+  geom_hex(show.legend = F) +
   geom_abline(slope = 1, intercept = 0, col = 'hotpink', lty = 'dashed') +
+  geom_smooth(method = 'lm', col = 'yellow') +
   ggrepel::geom_text_repel(
     data = de_livers %>%
-      filter(
-        ( abs(log_fc_fetal_liver) > 0.25 & abs(log_fc_maternal_liver) > 1.5 & de_class == 'both' ) |
-          ( abs(log_fc_fetal_liver) > 0.25 & de_class == 'fetal_only' ) |
-          ( abs(log_fc_maternal_liver) > 1.5 & de_class == 'maternal_only' )
-      ),
+      filter(timepoint == "timepoint5") %>% 
+      filter(!grepl("Gm.*", mgi_symbol)) %>% 
+      mutate(
+        labelled_points = case_when(
+          de_class %in% c("maternal response", "shared response") & abs(log_fc_maternal_liver) > 2 ~ TRUE,
+          de_class %in% c("fetal response") ~ TRUE,
+          abs(log_fc_fetal_liver) > 1 & abs(log_fc_maternal_liver) > 0.7 ~ TRUE
+        )
+      ) %>% 
+      filter(labelled_points == TRUE),
     aes(col = de_class, label = mgi_symbol), 
     max.overlaps = 30,
     fontface = "bold",
-    show.legend = T
+    key_glyph = "rect"
   ) +
-  scale_x_continuous(name = "Response in Maternal Liver") +
-  scale_y_continuous(name = "Response in Foetal Liver") +
+  scale_x_continuous(
+    name = "Maternal Liver response after\nintratracheal LPS instillation",
+    limits = c(-2.5, 3.5)
+    ) +
+  scale_y_continuous(
+    name = "Foetal Liver response after\nintratracheal LPS instillation",
+    limits = c(-2.5, 3.5)
+    ) +
+  viridis::scale_fill_viridis(
+    trans = 'log', 
+    breaks = scales::breaks_log(n = 5, base = 5), 
+    name = "number\nof genes",
+    limits = c(1,600), 
+    direction = -1,
+    option = 'viridis'
+  ) +
+  scale_color_brewer(type = 'qual', palette = 1, name = NULL) +
+  theme_classic() +
+  theme(
+    legend.position = c(.12,.8),
+    legend.background = element_blank(),
+    axis.line = element_blank(),
+    axis.title = element_text(hjust = 0.4)
+  ) +
+  annotate(
+    y = -Inf, yend = -Inf, x = -2, xend = 2, geom = "segment"
+  ) +
+  annotate(
+    x = -Inf, xend = -Inf, y = -2, yend = 2, geom = "segment"
+  )
+
+livers_plot
+```
+
+```{r plot liver vs lung}
+
+de_liver_lung <-
+  "results/limma_compile_results/limma_results_no_maternal_contrasts.csv" %>% 
+  here::here() %>% 
+  read_csv() %>%
+  mutate(
+    timepoint = factor(x = timepoint, levels = paste0("timepoint", c(2,5,12,24)))
+  ) %>% 
+  filter(
+    tissue %in% c('fetal_liver', 'maternal_lung'),
+    exposure == "response",
+    timepoint == "timepoint5"
+  ) %>% 
+  select(
+    tissue, timepoint, ensembl_gene_id, mgi_symbol, log_fc = logFC, q_value
+  ) %>% 
+  pivot_wider(names_from = tissue, values_from = c(log_fc, q_value) ) %>% 
+  na.exclude() %>% 
+  filter(
+    q_value_maternal_lung < q_value_threshold | q_value_fetal_liver < q_value_threshold,
+    abs(log_fc_maternal_lung) > log_fc_threshold | abs(log_fc_fetal_liver) > log_fc_threshold
+  ) %>% 
+  mutate(
+    de_class = case_when(
+      q_value_fetal_liver < q_value_threshold & q_value_maternal_lung < q_value_threshold ~ 'both',
+      q_value_fetal_liver < q_value_threshold & q_value_maternal_lung >= q_value_threshold ~ 'fetal only',
+      q_value_fetal_liver >= q_value_threshold & q_value_maternal_lung < q_value_threshold ~ 'maternal only'
+    )
+  )
+
+liver_lung_plot <-
+  de_liver_lung %>% 
+  ggplot(
+    aes(
+      x = log_fc_fetal_liver,
+      y = log_fc_maternal_lung
+    )
+  ) +
+  geom_hex(show.legend = F) +
+  geom_abline(slope = 1, intercept = 0, col = 'hotpink', lty = 'dashed') +
+  geom_smooth(method = 'lm', col = 'yellow') +
+  ggrepel::geom_text_repel(
+    data = de_liver_lung %>%
+      filter(timepoint == "timepoint5") %>% 
+      filter(!grepl("Gm.*", mgi_symbol)) %>% 
+      mutate(
+        labelled_points = case_when(
+          de_class %in% c("maternal only", "both") & abs(log_fc_maternal_lung) > 3 ~ TRUE,
+          de_class %in% c("fetal_only") ~ TRUE,
+          abs(log_fc_fetal_liver) > 1 & abs(log_fc_maternal_lung) > 0.7 ~ TRUE
+        )
+      ) %>% 
+      filter(labelled_points == TRUE),
+    aes(col = de_class, label = mgi_symbol), 
+    max.overlaps = 30,
+    fontface = "bold",
+    show.legend = F
+  ) +
+  scale_x_continuous(name = "Foetal Liver response after\nintratracheal LPS instillation") +
+  scale_y_continuous(name = "Maternal Lung response after\nintratracheal LPS instillation") +
   viridis::scale_fill_viridis(
     trans = 'log', 
     breaks = c(1,5,50,500),
@@ -234,7 +411,17 @@ de_livers %>%
   ) +
   scale_color_brewer(type = 'qual') +
   theme_classic() +
-  theme(legend.position = 'right')
+  theme(legend.position = NULL)
+
+liver_lung_plot
+```
+
+```{r final plot, fig.width=15, fig.height=15}
+
+placenta_plot + lung_plot + livers_plot + plot_layout(nrow = 2, byrow = F)
+
+here::here("reports/direct_vs_indirect_exposure/fold_change_plots.pdf") %>% 
+  ggsave()
 
 ```
 
