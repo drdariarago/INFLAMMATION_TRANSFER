@@ -14,5 +14,13 @@ The only quality adjustment required is trimming the first 11 bases to avoid ada
 We work off the GENCODE mouse genome version 38 and transcriptome version 23.
 
 ## How to implement the pipeline
-The pipeline requires an installed snakemake environment.
-We will add in further software version as they are used.
+The pipeline requires an installed snakemake environment.  
+In order to install all required software, install [conda](https://snakemake.readthedocs.io/en/stable/getting_started/installation.html) on your system and then use the command
+
+`conda env create -f env/pymake.yaml`
+
+Please remember to activate the environment with 
+
+`conda activate pymake`
+
+before running the pipeline.
