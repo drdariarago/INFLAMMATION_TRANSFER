@@ -40,7 +40,11 @@ phospho_results <-
 
 protein_id <-
   getBM(
-    mart = useEnsembl(biomart = "ensembl", dataset = "mmusculus_gene_ensembl"),
+    mart = useEnsembl(
+      biomart = "ensembl", 
+      dataset = "mmusculus_gene_ensembl",
+      mirror = "www"
+      ),
     filters = "uniprot_gn_id", 
     attributes = c("ensembl_gene_id", "mgi_symbol", "uniprot_gn_id"),
     values =  phospho_results$uniprot %>% unique
@@ -54,7 +58,6 @@ annotated_phospho_results <-
   left_join(protein_id, ., by = c("uniprot_gn_id" = "uniprot"))
 
 annotated_phospho_results %>% 
-  dplyr::select(-p_value) %>% 
   write_rds(x = ., file = snakemake@output[['sitewise_results']])
 
 # Export values binned by gene, averaging p-values by Fisher's method and then re-running FDR correction
@@ -73,6 +76,7 @@ genewise_annotated_phospho_results <-
       NA
     ),
     min_log_fc = log2(first(m_LPS)/first(m_ctrl)),
+    min_average = (first(m_LPS) + first(m_ctrl))/2,
     p_value_min = first(p_value),
     n_sites = n(),
     n_sign_sites = sum(p_value < 0.05),

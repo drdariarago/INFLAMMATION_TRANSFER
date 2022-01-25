@@ -173,7 +173,7 @@ volcano_2H <-
   geom_hex() + 
   geom_hline( yintercept = 0.05) +
   scale_y_log10() +
-  viridis::scale_fill_viridis( trans = 'log' )
+  viridis::scale_fill_viridis( trans = 'log', breaks = 2^c( 0:5 * 2) )
 
 volcano_5H <-
   linear_model %>% 
@@ -185,7 +185,7 @@ volcano_5H <-
   geom_hex() + 
   geom_hline( yintercept = 0.05) +
   scale_y_log10() +
-  viridis::scale_fill_viridis( trans = 'log' )
+  viridis::scale_fill_viridis( trans = 'log', breaks = 2^c( 0:5 * 2) )
 
 MA_2H <- 
   linear_model %>% 
@@ -195,7 +195,7 @@ MA_2H <-
     aes( x = AveExpr, y = logFC)
   ) + 
   geom_hex() +
-  viridis::scale_fill_viridis( trans = 'log' )
+  viridis::scale_fill_viridis( trans = 'log', breaks = 2^c( 0:5 * 2) )
 
 MA_5H <- 
   linear_model %>% 
@@ -205,7 +205,7 @@ MA_5H <-
     aes( x = AveExpr, y = logFC)
   ) + 
   geom_hex() +
-  viridis::scale_fill_viridis( trans = 'log' )
+  viridis::scale_fill_viridis( trans = 'log', breaks = 2^c( 0:5 * 2) )
 
 (volcano_2H + MA_2H) / (volcano_5H + MA_5H) +
   plot_annotation( title = glue::glue("Volcano and MA plots for {snakemake@params[['tissue']]}") )

@@ -2,18 +2,21 @@
 
 library(tidyverse)
 library(magrittr)
+library(patchwork)
 
-q_value_threshold = snakemake@params[['q_value_threshold']]
-log_fc_threshold = snakemake@params[['log_fc_threshold']]
-a4_short_long = c(210, 297) * 2
+q_value_threshold = 0.05
+log_fc_threshold = 0.25
+a4_short_long = c(210, 297)
 
 ## Import DE genes from inflammation study and from our study
 de_inflammation_results <-
-  snakemake@input[['de_inflammation_results']] %>% 
-  read_rds()
+  "results/process_lien_results/fold_change_summary.rds" %>% 
+  here::here() %>% 
+  read_rds() 
 
 de_transfer_results <-
-  snakemake@input[['de_transfer_results']] %>% 
+  "results/limma_compile_results/limma_results_no_maternal_contrasts.csv" %>% 
+  here::here() %>% 
   read_csv() %>%
   mutate(
     timepoint = factor(x = timepoint, levels = paste0("timepoint", c(2,5,12,24)))
@@ -85,7 +88,31 @@ filtered_shared_de <-
     alpha = (log_fc_inflamed / 5) ^2 +  log_fc_transfer^2  %>% sqrt
   )
   
-write_rds(x = filtered_shared_de, file = snakemake@output[['filtered_shared_genes_list']])
+write_rds(
+  x = filtered_shared_de, 
+  file = "results/inflammation_comparison/filtered_shared_genes_list.rds" %>% here::here()
+  )
+
+# Select top 100 up regulated genes in our and their experiment, then compare Venn diagram 
+filtered_shared_de %$% 
+  placenta %>% 
+  group_by(ensembl_gene_id) %>% 
+  summarise(
+    ensembl_gene_id = first(ensembl_gene_id),
+    mgi_symbol = first(mgi_symbol),
+    q_value_transfer = min(q_value_transfer),
+    q_value_inflamed = min(q_value_inflamed)
+  ) %>% 
+  mutate(
+    rank_transfer = dense_rank(q_value_transfer),
+    rank_inflamed = dense_rank(q_value_inflamed)
+  ) %>% 
+  filter(
+    rank_transfer < 300, rank_inflamed < 300
+  ) %>% 
+  slice_min(n = 10, order_by = rank_transfer)
+
+# No correlation until we hit 2-3000 genes
 
 # Calculate and compare baseline expression in inflamed and indirect placenta
 filtered_shared_de[[1]] %>% 
@@ -104,7 +131,7 @@ filtered_shared_de[[1]] %>%
   ggtitle(label = "Baseline expression of indirect and direct placenta inflammation at each timepoint")
 
 ggsave(
-  filename = snakemake@output[['placenta_baseline_plot']], 
+  filename = "results/inflammation_comparison/placenta_baseline_plot.pdf" %>% here::here(), 
   width = a4_short_long[2], height = a4_short_long[1],
   units = 'mm'
 )
@@ -137,7 +164,7 @@ filtered_shared_de[[1]] %>%
   ggtitle(label = "logFoldChange of indirect and direct placenta inflammation at each timepoint")
 
 ggsave(
-  filename = snakemake@output[['placenta_response_plot']],
+  filename = "results/inflammation_comparison/placenta_response_plot.pdf" %>% here::here(),
   width = a4_short_long[2], height = a4_short_long[1],
   units = 'mm'
 )
@@ -161,7 +188,7 @@ filtered_shared_de[[2]] %>%
   ggtitle(label = "Baseline expression of inflamed placenta and lung at each timepoint")
 
 ggsave(
-  filename = snakemake@output[['lung_baseline_plot']],
+  filename = "results/inflammation_comparison/lung_baseline_plot.pdf" %>% here::here(),
   width = a4_short_long[2], height = a4_short_long[1],
   units = 'mm'
 )
@@ -193,7 +220,100 @@ filtered_shared_de[[2]] %>%
   ggtitle(label = "Log Fold Change of indirect placenta and lung inflammation at 2 and 5 hpe")
 
 ggsave(
-  filename = snakemake@output[['lung_response_plot']], 
+  filename = "results/inflammation_comparison/lung_response_plot.pdf", 
   width = a4_short_long[2], height = a4_short_long[1], 
   units = 'mm'
 )
+
+interesting = c( 
+  paste0("Ccl", c(2,11,7,22,3,20)), 
+  paste0("Cxcl", c(2,5,10,11)),
+  paste0("Il", c("1a", "1b", 6, 10, 4, 18, 12)),
+  "Tnf", "Fgf1", "Fgf11", "Vegfb", 
+  paste0("Csf", 1:3)
+  )
+
+filtered_shared_de$placenta %>% 
+  # filter(de_class == "both") %>% 
+  ggplot(aes(x = log_fc_transfer, y = log_fc_inflamed, col = mgi_symbol %in% interesting, label = mgi_symbol)) + 
+  geom_point() + 
+  ggrepel::geom_text_repel(data = filtered_shared_de$placenta %>% filter(mgi_symbol %in% interesting ), max.overlaps = 20) +
+  facet_grid( timepoint ~ de_class) 
+
+
+## Manuscript version of the plot (just 5 hours)
+library(patchwork)
+# filtered_shared_de[[1]] %>% 
+#   mutate(de_class = fct_recode( 
+#     de_class,
+#     both = "Shared Response", 
+#     inflamed_only = "Specific to Focal Placenta", 
+#     transfer_only = "Absent from Focal Placenta"
+#   ))
+
+placenta_plot <-
+  filtered_shared_de[[1]] %>% 
+  filter(timepoint == "timepoint5") %>% 
+  ggplot(
+    aes(
+      x = log_fc_inflamed, y = log_fc_transfer, 
+      label = mgi_symbol
+    )
+  ) +
+  geom_hex() +
+  viridis::scale_fill_viridis(
+    trans = 'log', 
+    breaks = c(2^(c(1:4)*2), 600), 
+    name = "number\nof genes",
+    limits = c(1,600)
+  ) +
+  geom_abline(slope = 1, intercept = 0, col = 'hotpink', lty = 'dashed') +
+  # geom_smooth(method = 'lm', col = 'magenta', alpha = 0.5)  +
+  facet_wrap( ~ de_class ) + 
+  scale_x_continuous(name = "Response in Focal\nPlacenta Inflammation", limits = c(-3, 7.5)) +
+  theme(legend.position = 'right') +
+  ggrepel::geom_text_repel(
+    data = filtered_shared_de[[1]] %>% filter(timepoint == "timepoint5") %>% 
+      filter( 
+        ( abs(log_fc_transfer) > 0.3 & abs(log_fc_inflamed) > 1.5 & de_class == 'both' ) |
+          ( abs(log_fc_transfer) > 0.7 & de_class == 'transfer_only' ) |
+          ( abs(log_fc_inflamed) > 4 & de_class == 'inflamed_only' )
+      ), 
+    col = 'hotpink'
+  ) +
+  scale_y_continuous(name = "Response in Indirect\nPlacenta Inflammation") +
+  theme_bw()
+
+lung_plot <- filtered_shared_de[[2]] %>% 
+  filter(timepoint == "timepoint5") %>% 
+  ggplot(
+    aes(
+      x = log_fc_inflamed, y = log_fc_transfer, 
+      label = mgi_symbol
+    )
+  ) +
+  geom_hex()+
+  geom_abline(slope = 1, intercept = 0, col = 'hotpink', lty = 'dashed') +
+  # geom_smooth(method = 'lm', col = 'magenta')  +
+  facet_wrap( ~ de_class ) + 
+  theme(legend.position = 'right') +
+  viridis::scale_fill_viridis(
+    trans = 'log', 
+    breaks = c(2^(c(1:4)*2), 600), 
+    name = "number\nof genes",
+    limits = c(1,600)
+  ) +
+  ggrepel::geom_text_repel(
+    data = filtered_shared_de[[2]] %>% filter(timepoint == "timepoint5") %>% 
+      filter(
+        ( abs(log_fc_transfer) > 2.5 & abs(log_fc_inflamed) > 2.5 & de_class == 'both' ) |
+          ( abs(log_fc_transfer) > 2 & de_class == 'transfer_only' ) |
+          ( abs(log_fc_inflamed) > 2 & de_class == 'inflamed_only' )
+      ),
+    col = 'hotpink'
+  ) +
+  scale_x_continuous(name = NULL) +
+  scale_y_continuous(name = "Response in Focal\nLung Inflammation") +
+  theme_classic()
+
+lung_plot / placenta_plot

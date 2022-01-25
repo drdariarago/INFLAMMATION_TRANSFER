@@ -1,0 +1,195 @@
+---
+title: "Limma plots"
+author: "Alfredo Rago"
+date: "08/10/2021"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+
+# Create reverse log10 scale for volcanoes (uses package scales)
+reverse_log10 <- 
+  scales::trans_new(
+    name = "reverse_log10", 
+    transform = function(x){-log(x,10)}, 
+    inverse = function(x){10^(-x)}, 
+    breaks = scales::log_breaks(base = 10), 
+    domain = c(0,Inf)
+  )
+
+rna_results <-
+  here::here("results/limma_compile_results/limma_results_no_maternal_contrasts.csv") %>% 
+  read_csv() %>% 
+  mutate(
+    timepoint = factor(x = timepoint, levels = paste0("timepoint", c(2,5,12,24)) )
+  )
+```
+
+```{r remove low baseline expression genes}
+
+rna_results %>% 
+  filter( exposure == "baseline") %>% 
+  ggplot(
+    aes( x = logFC )
+  ) +
+  geom_density() +
+  geom_vline(xintercept = 1)
+
+genes_over_threshold <-
+  rna_results %>% 
+  filter(
+    exposure == "baseline",
+    logFC > 1
+  ) %>% 
+  select(
+    tissue, timepoint, ensembl_gene_id, mgi_symbol
+  ) %>% 
+  distinct()
+
+filtered_rna_results <-
+  rna_results %>% 
+  filter(exposure != "baseline") %>% 
+  left_join(
+    x = genes_over_threshold,
+    y = .
+  )
+```
+
+```{r filter genes for annotation}
+
+filtered_genes <-
+  filtered_rna_results %>% 
+  filter( 
+    tissue %in% c("placentas", "fetal_liver"),
+    timepoint %in% paste0("timepoint", c(2,5)),
+    q_value < 0.05,
+    abs(logFC) >= 0.5,
+    !grepl("*Rik|Gm[0-9]*", mgi_symbol)
+  ) %>% 
+  select( -contrast, -exposure) %>% 
+  group_by(tissue, timepoint) 
+
+top_genes <-
+  filtered_genes %>% 
+  arrange( -abs(logFC) ) %>% 
+  slice_head( n = 20 ) %>% 
+  select( tissue, timepoint, mgi_symbol, ensembl_gene_id)
+
+highly_significant_genes <-
+  filtered_genes %>% 
+  arrange( q_value ) %>% 
+  slice_head( n = 10) %>% 
+  select( tissue, timepoint, mgi_symbol, ensembl_gene_id)
+
+genes_to_annotate <-
+  rbind(
+    top_genes, 
+    highly_significant_genes
+  ) %>% 
+  ungroup() %>% 
+  distinct() %>% 
+  mutate( annotate = "yes" )
+
+plot_data <-
+  right_join(
+    x = genes_to_annotate,
+    y = filtered_rna_results
+  )
+  
+```
+
+
+```{r volcano plots, fig.heigth = 15, fig.width = 15}
+plot_data %>% 
+  ggplot(
+    aes( x = logFC, y = q_value )
+  ) +
+  geom_hex() +
+  geom_hline( yintercept = 0.05, lty = 2, col = 'hotpink' ) +
+  facet_grid( timepoint ~ tissue, scales = 'free' ) +
+  scale_y_continuous( trans = reverse_log10 ) +
+  viridis::scale_fill_viridis(
+    trans = "log", 
+    breaks = scales::breaks_log(base = 2, n = 6)
+  ) +
+  theme_bw() +
+  ggtitle(label = "Volcano plots of RNA responses to LPS across tissues")
+
+ggsave( 
+  filename = here::here("reports/limma_plots/all_tissue_volcano.pdf")
+)
+```
+
+
+
+```{r placenta volcano plots, fig.width = 15, fig.height = 8}
+  
+placenta_plot_data <-
+  plot_data %>% 
+  filter( 
+    tissue  == "placentas",
+    timepoint %in% paste0("timepoint", c(2,5))
+  )
+
+placenta_plot_data %>% 
+  ggplot(
+    aes( x = logFC, y = q_value )
+  ) +
+  geom_hex() + 
+  viridis::scale_fill_viridis(trans = "log", breaks = c(4^(1:7)), direction = -1) +
+  facet_wrap(timepoint ~ ., scales = "free") +
+  scale_y_continuous(trans = reverse_log10, oob = scales::squish) +
+  scale_x_continuous(limits = c(-2, 2), oob = scales::squish) +
+  geom_hline(yintercept = 0.05, col = 'hotpink') +
+  ggrepel::geom_text_repel(
+    data = placenta_plot_data %>% filter( annotate == "yes"),
+    aes(label = mgi_symbol),
+    max.overlaps = 30
+  ) +
+  theme_minimal() +
+  ggtitle(
+    label = "Fold change responses in placenta at 2 and 5 hours post exposure",
+    subtitle = "Annotated, the top 20 significant genes with the highest fold change\nnote the difference in y axis"
+  )
+
+ggsave( 
+  filename = here::here("reports/limma_plots/placenta_2_5_hours_volcano.pdf")
+)
+```
+
+```{r liver volcano plots, fig.width = 15, fig.height = 8}
+
+liver_plot_data <-
+  plot_data %>% 
+  filter( 
+    tissue  == "fetal_liver",
+    timepoint %in% paste0("timepoint", c(2,5))
+  )
+
+liver_plot_data %>% 
+  ggplot(
+    aes( x = logFC, y = q_value )
+  ) +
+  geom_hex() + 
+  viridis::scale_fill_viridis(trans = "log", breaks = c(4^(1:7)), direction = -1) +
+  facet_wrap(timepoint ~ ., scales = "free") +
+  scale_y_continuous(trans = reverse_log10, oob = scales::squish) +
+  scale_x_continuous(limits = c(-2, 2), oob = scales::squish) +
+  geom_hline(yintercept = 0.05, col = 'hotpink') +
+  ggrepel::geom_text_repel(
+    data = liver_plot_data %>% filter( annotate == "yes"),
+    aes(label = mgi_symbol),
+    max.overlaps = 30
+  ) +
+  theme_minimal() +
+  ggtitle(
+    label = "Fold change responses in foetal liver at 2 and 5 hours post exposure",
+    subtitle = "Annotated, the top 20 significant genes with the highest fold change\nnote the difference in y axis"
+  )
+
+ggsave( 
+  filename = here::here("reports/limma_plots/liver_2_5_hours_volcano.pdf")
+)
+```

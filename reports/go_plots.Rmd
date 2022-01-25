@@ -1,0 +1,307 @@
+---
+title: "GO plots"
+output:
+  html_document:
+    df_print: paged
+---
+
+
+```{r load datasets, include=FALSE}
+library(tidyverse)
+library(magrittr)
+library(GOxploreR)
+library(GOSemSim)
+
+GO_results <-
+  here::here("results/gost_enrichment_format") %>% 
+  list.files(
+    path = ., 
+    pattern = "enrichment.*long.csv", 
+    full.names = T
+    ) %>% 
+  setNames(
+    nm = 
+      str_extract(string = ., pattern = "(fetal|maternal|placentas)(_liver|_lung)?_(up|down)regulated"),
+    object = .
+    ) %>% 
+  map(
+    .f = read_csv
+  )
+
+mmGO <- godata('org.Mm.eg.db', ont = 'BP')
+
+```
+
+```{r sm table}
+
+GO_results %>% 
+  map_dfr(
+    .f = ~ .x,
+    .id = "tissue"
+  ) %>% 
+  write_csv(
+    here::here("reports/go_plots/full_go_results.csv")
+  )
+
+```
+
+
+```{r compute term rankings, include=FALSE}
+
+# Perform GO ranking
+ranked_go_results <-
+  GO_results %>% 
+  map(
+    .x = .,
+    .f = ~ dplyr::filter(
+    .data = .x,
+    source == "GO:BP",
+    contrast == "timepoint5",
+    term_size > 30,
+    term_size < 1000,
+    intersection_percent > 30,
+    significant == TRUE
+    )
+  ) %>% 
+  keep(
+    .p = ~ nrow(.x) > 15
+  ) %>% 
+  map(
+    .f = pull,
+    var = term_id
+  ) %>% 
+  map(
+    .x = .,
+    .f = ~ scoreRankingGO(
+      goterm = .x,
+      domain = "BP",
+      plot = FALSE
+    )
+  )
+
+# Convert list of results into list of tibbles
+
+ranked_go_tibbles <-
+  ranked_go_results %>% 
+  modify(
+    .x = .,
+    .f = ~ magrittr::extract(.x, 1:3) %>% as_tibble
+  ) %>% 
+  modify(
+    .x = .,
+    .f = ~ rename(
+      .x,
+      GO_terms_ranking = "term_id"
+    )
+  ) 
+
+annotated_tibbles <-
+  map2(
+    # Annotate the GO terms with size and overlap from our dataset
+    .x = ranked_go_tibbles, 
+    .y = GO_results[names(ranked_go_tibbles)],
+    .f = ~ left_join(
+      x = .x,
+      y = .y %>% 
+        filter(contrast == "timepoint5") %>% 
+        dplyr::select(term_id, term_name, term_size, intersection_percent) %>%
+        distinct(),
+      by = "term_id"
+    )
+  )
+
+ranked_go_tibble <-
+  map2(
+    # Annotate the GO terms with size and overlap from our dataset
+    .x = ranked_go_tibbles, 
+    .y = GO_results[names(ranked_go_tibbles)],
+    .f = ~ left_join(
+      x = .x,
+      y = .y %>% 
+        filter(contrast == "timepoint5") %>% 
+        dplyr::select(term_id, term_name, term_size, intersection_percent) %>%
+        distinct(),
+      by = "term_id"
+    )
+  ) %>% 
+  map_dfr(
+    # Merge list into single tibble
+    .x = ., .id = "tissue",
+    .f = ~ .x
+  )
+
+```
+
+```{r semantic similarity}
+# Compute semantic similarity matrix for each tissue
+# Select 15 clusters per tissue
+# Report only top ranking GO per cluster
+
+tissues <- unique(ranked_go_tibble$tissue) %>% 
+  set_names(x = ., value = .)
+
+go_similarities <-
+  map(
+    .x = tissues, 
+    .f = ~ ranked_go_tibble %>% 
+      filter(tissue == .x) %$% 
+      term_id
+  ) %>% 
+  map(
+    .f = ~ mgoSim(
+      GO1 = .x,
+      GO2 = .x,
+      semData = mmGO,
+      combine = NULL, 
+      measure = 'Wang'
+    )
+  ) %>% 
+  map( dist ) %>% 
+  map( hclust, method = 'single' ) %>% 
+  map( cutree, k = 15) %>% 
+  map_dfr(
+    .f = as_tibble,
+    rownames = "term_id",
+    .id = "tissue"
+  ) %>% 
+  dplyr::rename(
+    similarity_cluster = value
+  )
+
+go_similarities
+
+slimmed_annotated_go_tibble <-
+  full_join(
+    x = go_similarities, 
+    y = ranked_go_tibble,
+    by = c("tissue" = "tissue", "term_id" = "term_id")
+  ) %>% 
+  group_by(tissue, similarity_cluster) %>% 
+  arrange(tissue, similarity_cluster, -score) %>% 
+  summarise(
+    across(.cols = everything(), .fns = dplyr::first
+    )
+  )
+
+```
+```{r reformat and add small GO lists}
+
+low_quality_tibble <- 
+  setdiff(
+    names(GO_results),
+    slimmed_annotated_go_tibble$tissue
+  ) %>% 
+  magrittr::extract(GO_results, .) %>% 
+  map(
+    .f = ~ dplyr::filter(
+      .data = .x,
+      source == "GO:BP",
+      contrast == "timepoint5",
+      term_size > 30,
+      term_size < 1000,
+      intersection_percent > 30,
+      significant == TRUE
+    )
+  ) %>% 
+  map_dfr(
+    .id = "tissue", 
+    .f = ~ .x
+  ) %>% 
+  mutate(
+    similarity_cluster = dense_rank(term_size),
+    indices_of_ranking = dense_rank(term_size),
+    score = n() - dense_rank(term_size)
+  ) %>% 
+  dplyr::select(
+    colnames(slimmed_annotated_go_tibble)
+  )
+
+slimmed_annnotated_go_plus_low_quality <-
+  rbind(
+    mutate(slimmed_annotated_go_tibble, tissue = paste0(tissue, '*')), 
+    mutate(low_quality_tibble, tissue = tissue)
+    ) %>% 
+  mutate(
+    direction = str_extract(tissue, "(up|down)regulated.*"),
+    tissue = str_extract(tissue, "(fetal|maternal|placentas)(_liver|_lung)?")
+  )
+
+```
+
+
+```{r plot single tissue}
+
+slimmed_annnotated_go_plus_low_quality %>% 
+  filter(tissue == "maternal_lung", direction == "downregulated") %>% 
+  mutate(
+    go_rank = rank(score, ties.method = 'first')
+  ) %>% 
+    ggplot(
+    aes( 
+      x = intersection_percent, y = term_size %>% rank(ties.method = 'first') %>%  as.factor, 
+      fill = term_size,
+      label = term_name
+      )
+  ) +
+  geom_col() +
+  geom_text(x = 0.05, hjust = 0, col = 'black', size = 4, fontface = 'bold') +
+  viridis::scale_fill_viridis(
+    name = "Term Size", 
+    trans = 'log', 
+    begin = 0.5, end = 1,
+    breaks = scales::breaks_log(base = 2, n = 3)
+  ) +
+  scale_x_log10(name = "Intersection Percent") +
+  scale_y_discrete() +
+  theme_classic() +
+  theme(
+    axis.text.y = element_blank(),
+    legend.position = 'bottom',
+    axis.line.y = element_blank(),
+    axis.ticks.y = element_blank(),
+    axis.title.y = element_blank()
+  ) +
+  ggtitle("Top GO terms enriched in XX at 5 hpe", subtitle = "GO:BP")
+
+```
+
+```{r plot all results, fig.width= 15, fig.height=10}
+
+slimmed_annnotated_go_plus_low_quality %>% 
+  mutate(
+    term_size_rank = -term_size %>% rank(ties.method = 'first') %>%  as.factor
+  ) %>% 
+  ggplot(
+    aes( 
+      x = intersection_percent, y = term_size_rank, 
+      fill = term_size,
+      label = term_name
+      )
+  ) +
+  geom_col() +
+  geom_text(x = 0.05, hjust = 0, col = 'black', size = 4, fontface = 'bold') +
+  facet_wrap( ~ tissue + direction, scales = "free_y", nrow = 2, labeller = label_both) +
+  viridis::scale_fill_viridis(
+    name = "Term Size", 
+    trans = 'log', 
+    begin = 0.5, end = 1,
+    breaks = c(30, 60, 120, 240, 480, 800)
+  ) +
+  scale_x_continuous(name = "Percent Overlap", breaks = scales::breaks_pretty(n = 5)) +
+  scale_y_discrete() +
+  theme_classic() +
+  theme(
+    axis.text.y = element_blank(),
+    strip.background = element_rect(fill = 'lightblue', colour = 'white'),
+    legend.position = c(0.8, 0.3),
+    axis.line.y = element_blank(),
+    axis.ticks.y = element_blank(),
+    axis.title.y = element_blank()
+  ) +
+  ggtitle("Top GO terms enriched at 5 hpe", subtitle = "GO:BP")
+
+here::here("reports/go_plots/go_bar_plots.pdf") %>% 
+  ggsave()
+
+```
+
