@@ -32,6 +32,20 @@ mmGO <- godata('org.Mm.eg.db', ont = 'BP')
 
 ```
 
+```{r sm table}
+
+GO_results %>% 
+  map_dfr(
+    .f = ~ .x,
+    .id = "tissue"
+  ) %>% 
+  write_csv(
+    here::here("reports/go_plots/full_go_results.csv")
+  )
+
+```
+
+
 ```{r compute term rankings, include=FALSE}
 
 # Perform GO ranking

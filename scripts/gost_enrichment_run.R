@@ -14,7 +14,7 @@ limma_results <-
   read_csv() %>% 
   filter(tissue == model) 
 
-# Set background gene expression as all responder genes across all timepoints
+# Set background gene expression as all expressed genes across all timepoints
 background_genes <-
   limma_results %>% 
   filter(

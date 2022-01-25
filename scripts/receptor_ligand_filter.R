@@ -45,9 +45,9 @@ messenger_tissues <- c("maternal_lung", "maternal_liver")
 target_tissues <- c("placentas", "fetal_liver")
 timepoints <- paste("timepoint", c(2,5,12,24), sep = "")
 log_fc_threshold <- 0.5
-q_value_threshold <-0.05
+q_value_threshold <- 0.05
 
-# Subset only receptors that are expressed (more than 8 counts baseline in at least one timepoint of interest) 
+# Subset only receptors that are expressed (more than 8 normalized counts baseline in at least one timepoint of interest) 
 # in the target tissues and the ligands that target them
 
 expressed_receptors <-

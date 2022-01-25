@@ -7,6 +7,25 @@ site_results <-
   here::here("results/phospho_import/sitewise_results.rds") %>% 
   read_rds()
 
+# Create reverse log10 scale for volcanoes
+
+library("scales")
+reverse_log10_trans <- function() {
+  trans <- function(x) -log(x, 10)
+  inv <- function(x) 10^(-x)
+  trans_new(paste0("reverselog-", format(10)), trans, inv, 
+            log_breaks(base = 10), 
+            domain = c(1e-100, Inf))
+}
+
+scales::trans_new(
+  name = "reverse_log10", 
+  transform = function(x){-log(x,10)}, 
+  inverse = function(x){10^(-x)}, 
+  breaks = log_breaks(base = 10), 
+  domain = c(0,Inf)
+)
+
 ## MA plots for sites
 
 site_results %>% 
@@ -18,7 +37,8 @@ site_results %>%
   ) +
   geom_hex() +
   viridis::scale_fill_viridis(trans = "log", breaks = c(1,5,25,125), direction = -1) +
-  scale_x_log10() +
+  scale_x_log10(name = "Mean Signal") +
+  scale_y_continuous(name = "log Fold Change") +
   # scale_y_continuous(limits = c(-2,2)) +
   facet_grid(tissue ~ timepoint) +
   geom_point(
@@ -27,12 +47,15 @@ site_results %>%
   ) +
   ggrepel::geom_text_repel(
     data = site_results %>% filter(FDR < 0.05, logFC > 1 ),
+    max.overlaps = 35,
+    col = 'hotpink',
     aes(label = mgi_symbol)
   ) +
   geom_rug(
     data = site_results %>% filter(FDR < 0.05, abs(logFC) > 1 ),
     alpha = 0.1
-  )
+  ) +
+  ggtitle("MA plot of Phosphorilated sites\nsignificance threshold 0.05\nfold change threshold 1")
 
 ggsave(here::here("results/phospho_visualize/site_ma_plot.pdf"))
 
@@ -48,7 +71,7 @@ site_results %>%
   geom_hex() + 
   viridis::scale_fill_viridis(trans = "log", breaks = c(4^(1:7)), direction = -1) +
   facet_grid(tissue ~ timepoint) +
-  scale_y_continuous(trans = 'log10', limits = c(1e-06, 1), oob = scales::squish) +
+  scale_y_continuous(trans = "reverse_log10", oob = scales::squish, limits = c(1, 1e-7)) +
   scale_x_continuous(limits = c(-2, 2), oob = scales::squish) +
   geom_hline(yintercept = 0.05, col = 'hotpink') +
   ggrepel::geom_text_repel(
@@ -60,37 +83,45 @@ site_results %>%
 ggsave(filename = here::here("results/phospho_visualize/site_volcano_plot.pdf"), 
        width = 15, height = 10)
 
-## Same but on averaged gene results
+## Same but only one site per gene (most significant site)
 
 gene_results <-
   here::here("results/phospho_import/genewise_results.rds") %>%
   read_rds()
 
-## Volcano plot for genes
-
-gene_results %>%
+## MA plot for genes
+gene_results %>% 
   ggplot(
     aes(
-      x = min_log_fc,
-      y = q_value_avg
+      x = min_average,
+      y = min_log_fc
     )
   ) +
   geom_hex() +
-  viridis::scale_fill_viridis(trans = "log", breaks = c(3^(1:6)), direction = -1) +
+  viridis::scale_fill_viridis(trans = "log", breaks = c(1,5,25,125), direction = -1) +
+  scale_x_log10(name = "Mean Signal") +
+  scale_y_continuous(name = "log Fold Change", limits = c(-2,2), oob = scales::squish ) +
   facet_grid(tissue ~ timepoint) +
-  geom_hline(yintercept = 0.05) +
-  scale_y_continuous(trans = 'log10', limits = c(1e-14, 1), oob = scales::squish) +
-  scale_x_continuous(limits = c(-2,2), oob = scales::squish) +
-  geom_hline(yintercept = 0.05, col = 'hotpink') +
+  geom_point(
+    data = gene_results %>% filter(q_value_min < 0.05, abs(min_log_fc) > 1 ),
+    alpha = 0.5
+  ) +
   ggrepel::geom_text_repel(
-    data = gene_results %>% filter(q_value_avg < 1e-3, abs(min_log_fc) > 1 ),
+    data = gene_results %>% filter(q_value_min < 0.05, min_log_fc > 1 ),
+    max.overlaps = 35,
+    col = 'hotpink',
     aes(label = mgi_symbol)
   ) +
-  ggtitle(label = "Volcano plot for gene-wise phosphorilation")
+  geom_rug(
+    data = gene_results %>% filter(q_value_min < 0.05, abs(min_log_fc) > 1 ),
+    alpha = 0.1
+  ) +
+  ggtitle(label = "MA plot for gene-wise phosphorilation, most DE site only")
 
-ggsave(filename = here::here("results/phospho_visualize/gene_volcano_plot.pdf"), 
+ggsave(filename = here::here("results/phospho_visualize/gene_MA_plot.pdf"), 
        width = 15, height = 10)
 
+## Volcano plot for genes
 gene_results %>%
   ggplot(
     aes(
@@ -107,10 +138,13 @@ gene_results %>%
   geom_hline(yintercept = 0.05, col = 'hotpink') +
   ggrepel::geom_text_repel(
     data = gene_results %>% filter(q_value_avg < 1e-04, abs(min_log_fc) > 1 ),
+    max.overlaps = 20,
     aes(label = mgi_symbol)
   ) +
-  ggtitle(label = "Volcano plot for gene-wise phosphorilation")
+  ggtitle(label = "Volcano plot for gene-wise phosphorilation, most DE site only")
 
+ggsave(filename = here::here("results/phospho_visualize/gene_volcano_plot.pdf"), 
+       width = 15, height = 10)
 
 # Import raw results and plot PCA of samples
 

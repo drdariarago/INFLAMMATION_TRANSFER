@@ -2,6 +2,7 @@
 
 library(tidyverse)
 library(magrittr)
+library(patchwork)
 
 q_value_threshold = 0.05
 log_fc_threshold = 0.25
@@ -260,11 +261,16 @@ placenta_plot <-
     )
   ) +
   geom_hex() +
-  viridis::scale_fill_viridis(name = "number\nof genes", trans = 'log', breaks = c( 2^(2*0:5) )) +
+  viridis::scale_fill_viridis(
+    trans = 'log', 
+    breaks = c(2^(c(1:4)*2), 600), 
+    name = "number\nof genes",
+    limits = c(1,600)
+  ) +
   geom_abline(slope = 1, intercept = 0, col = 'hotpink', lty = 'dashed') +
   # geom_smooth(method = 'lm', col = 'magenta', alpha = 0.5)  +
   facet_wrap( ~ de_class ) + 
-  scale_x_continuous(name = "Response in\nFocal Placenta Inflammation", limits = c(-3, 7.5)) +
+  scale_x_continuous(name = "Response in Focal\nPlacenta Inflammation", limits = c(-3, 7.5)) +
   theme(legend.position = 'right') +
   ggrepel::geom_text_repel(
     data = filtered_shared_de[[1]] %>% filter(timepoint == "timepoint5") %>% 
@@ -275,7 +281,7 @@ placenta_plot <-
       ), 
     col = 'hotpink'
   ) +
-  scale_y_continuous(name = "Response in\nIndirect Placenta Inflammation") +
+  scale_y_continuous(name = "Response in Indirect\nPlacenta Inflammation") +
   theme_bw()
 
 lung_plot <- filtered_shared_de[[2]] %>% 
@@ -291,7 +297,12 @@ lung_plot <- filtered_shared_de[[2]] %>%
   # geom_smooth(method = 'lm', col = 'magenta')  +
   facet_wrap( ~ de_class ) + 
   theme(legend.position = 'right') +
-  viridis::scale_fill_viridis(trans = 'log', breaks = c(2^(c(1:4)*2), 600), name = "number\nof genes") +
+  viridis::scale_fill_viridis(
+    trans = 'log', 
+    breaks = c(2^(c(1:4)*2), 600), 
+    name = "number\nof genes",
+    limits = c(1,600)
+  ) +
   ggrepel::geom_text_repel(
     data = filtered_shared_de[[2]] %>% filter(timepoint == "timepoint5") %>% 
       filter(
@@ -302,8 +313,7 @@ lung_plot <- filtered_shared_de[[2]] %>%
     col = 'hotpink'
   ) +
   scale_x_continuous(name = NULL) +
-  scale_y_continuous(name = "Response in\nFocal Lung Inflammation") +
-  theme_bw()
+  scale_y_continuous(name = "Response in Focal\nLung Inflammation") +
+  theme_classic()
 
 lung_plot / placenta_plot
-

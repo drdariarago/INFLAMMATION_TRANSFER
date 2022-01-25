@@ -13,15 +13,13 @@ import re
 rule all:
   input: 
     multiqc_report = "reports/multiqc/multiqc.html",
-    tpm_results = "results/tpm_summary/tpm_tibble.rds",
-    limma_results =  "results/limma_compile_results/limma_results_no_maternal_contrasts.csv",
-    go_results = expand(
-          "results/gost_enrichment_format/enrichment_{models}_{up_or_down}_long.csv",
-          models = MODELS, 
-          up_or_down = ("upregulated", "downregulated")
-    ),
     fold_change_matrices = "results/heatmap_fold_change_format/response_matrix_list.rds",
     receptor_ligand_map =  "results/match_orthologs/human_mouse_ligands_receptors.txt",
+    go_results = expand(
+      "results/gost_enrichment_format/enrichment_{models}_{up_or_down}_long.csv",
+      models = MODELS, 
+      up_or_down = ("upregulated", "downregulated")
+      ),
     upsetr_plots = expand(
           "results/upsetr/{tissue}.pdf",
           tissue = MODELS
@@ -35,13 +33,9 @@ rule all:
       tissue = ("placenta", "lung"),
       value = ("baseline", "response")
     ),
-    # # My reanalyses of the blagoy data, removed for consistency 
-    # phospho_results = expand(
-    #   "results/phospho_limma/{tissue}/significant_results.csv",
-    #   tissue = ("liver", "placenta")
-    # ),
-    phospho_premade = 'results/phospho_import/sitewise_results.rds',
-    phospho_plots = 'reports/phospho_plots/phospho_plots.html'
+    phospho_plots = 'reports/phospho_plots/phospho_plots.html',
+    ligands_over_time = "reports/ligands_over_time.html",
+    limma_plots = "reports/limma_plots.html"
 
 #### Quality controls ####
 
@@ -372,20 +366,10 @@ rule phospho_limma:
 # Create pathview graphs from rnaseq and phospho proteomic data    
 rule pathview_rnaseq:
   input:
-    rna = "results/limma_compile_results/limma_results_no_maternal_contrasts.csv",
+    rna = "results/limma_compile_results/limma_results_no_maternal_contrasts.csv"
   params:
     tissues = ("placentas", "fetal_liver", "maternal_lung"),
-    pathways = (
-      "mmu04064", "mmu04668", "mmu04020", "mmu04110", "mmu04210",
-      "mmu00190", "mmu04150", "mmu04010", "mmu04620", "mmu04062",
-      # "mmu03410", "mmu03420", "mmu03430", "mmu03450", # DNA repair
-      "mmu04060", "mmu04657", "mmu04810", "mmu04670",
-      "mmu04370", "mmu04012", "mmu04350", # angoigenesis
-      "mmu04068", "mmu04115", # oxidative stress
-      "mmu04530", # tight junctions/claudins
-      "mmu04514",
-      "mmu04658", "mmu04151", "mmu04630", "mmu04659", "mmu04660" # IL4
-      )
+    pathways = ("mmu03320", "mmu04979", "mmu00140", "mmu00061", "mmu01212", "mmu00071", "mmu00565", "mmu00561", "mmu00120", "mmu00010", "mmu00020", "mmu00620", "mmu00100", "mmu00190", "mmu00230", "mmu00250", "mmu00260", "mmu00270","mmu00280", "mmu00290", "mmu00310", "mmu00330", "mmu00340", "mmu00350", "mmu00360", "mmu00380", "mmu00400", "mmu00410", "mmu00430", "mmu00620", "mmu00670", "mmu00980", "mmu01040", "mmu01200", "mmu04024", "mmu04130", "mmu04136", "mmu04141", "mmu04146", "mmu04151", "mmu04310", "mmu04710", "mmu04713", "mmu04925", "mmu04927", "mmu04975") 
   output:
     rna = directory("results/pathview_rnaseq")
   resources: 
@@ -399,17 +383,7 @@ rule pathview_phospho:
     phospho_sites = "results/phospho_import/sitewise_results.rds"
   params:
     tissues = ("placentas", "fetal_liver"),
-    pathways = (
-      "mmu04064", "mmu04668", "mmu04020", "mmu04110", "mmu04210",
-      "mmu00190", "mmu04150", "mmu04010", "mmu04620", "mmu04062",
-      # "mmu03410", "mmu03420", "mmu03430", "mmu03450", # DNA repair
-      "mmu04060", "mmu04657", "mmu04810", "mmu04670",
-      "mmu04370", "mmu04012", "mmu04350", # angoigenesis
-      "mmu04068", "mmu04115", # oxidative stress
-      "mmu04530", # tight junctions/claudins
-      "mmu04514",
-      "mmu04658", "mmu04151", "mmu04630", "mmu04659", "mmu04660" # IL4
-      )
+    pathways = ("mmu03320", "mmu04979", "mmu00140", "mmu00061", "mmu01212", "mmu00071", "mmu00565", "mmu00561", "mmu00120", "mmu00010", "mmu00020", "mmu00620", "mmu00100", "mmu00190", "mmu00230", "mmu00250", "mmu00260", "mmu00270","mmu00280", "mmu00290", "mmu00310", "mmu00330", "mmu00340", "mmu00350", "mmu00360", "mmu00380", "mmu00400", "mmu00410", "mmu00430", "mmu00620", "mmu00670", "mmu00980", "mmu01040", "mmu01200", "mmu04024", "mmu04130", "mmu04136", "mmu04141", "mmu04146", "mmu04151", "mmu04310", "mmu04710", "mmu04713", "mmu04925", "mmu04927", "mmu04975") 
   output:
     phospho_genes = directory("results/pathview_phospho/genes"),
     phospho_sites = directory("results/pathview_phospho/sites")
@@ -502,7 +476,7 @@ rule inflammation_comparison:
   script:
     "scripts/inflammation_comparison.R"
 
-### Reports ####### 
+#### Reports ####### 
 
 rule phospho_plots:
   input:
@@ -511,3 +485,34 @@ rule phospho_plots:
     "reports/phospho_plots/phospho_plots.html"
   script:
     "reports/phospho_plots.Rmd"
+
+rule go_plots:
+  #### NOTE: the package GOxploreR is unavailable on conda channels, please install locally via CRAN
+  input:
+    expand(
+      "results/gost_enrichment_format/enrichment_{models}_{up_or_down}_long.csv",
+      models = MODELS, 
+      up_or_down = ("upregulated", "downregulated")
+      )
+  output:
+    "reports/go_plots.html"
+  script:
+    "reports/go_plots.Rmd"
+
+rule limma_plots:
+  input:
+    "results/limma_compile_results/limma_results_no_maternal_contrasts.csv"
+  output:
+    "reports/limma_plots.html"
+  script:
+    "reports/limma_plots.Rmd"
+
+rule ligands_over_time:
+  input:
+    "results/limma_compile_results/limma_results_no_maternal_contrasts.csv",
+    "results/tpm_summary/tpm_tibble.rds",
+    "data/blood_cytokines/cytokines_lung.csv"
+  output:
+    "reports/ligands_over_time.html"
+  script:
+    "reports/ligands_over_time.Rmd"
